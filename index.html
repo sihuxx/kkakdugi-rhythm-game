@@ -22,6 +22,7 @@
       <span id="homeClover"></span>
       <span class="hc">두기 · <b id="homeChar"></b></span>
       <button id="homeSongBtn" type="button">노래 고르기</button>
+      <button id="homeSetBtn" type="button">설정</button>
       <button id="homeTitleBtn" type="button">타이틀</button>
     </div>
 
@@ -30,7 +31,7 @@
       <h1>꺅두기 러닝비트<span class="sub">GGAKDUGI RUNNING BEAT</span></h1>
       <button class="btn" id="startBtn">출발!</button>
       <p class="wallet" id="wallet"></p>
-      <p class="keys"><span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">K</span> <span class="kbd">L</span> 네 줄로 내려오는 노트 · 길게 누르면 쓰왜</p>
+      <p class="keys"><span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">K</span> <span class="kbd">L</span> 네 줄로 내려오는 노트 · 길게 누르면 쓰왜 · 키는 설정에서 바꿀 수 있어요</p>
     </section>
 
     <section class="screen" id="resultScreen" hidden>
@@ -58,11 +59,17 @@
 
     <section class="screen" id="pauseScreen" hidden>
       <h1 style="font-size:clamp(24px,4.6vw,38px)">잠깐 쉬는 중</h1>
+      <p class="keys" id="pauseInfo"></p>
       <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
         <button class="btn" id="resumeBtn">이어서</button>
-        <button class="btn ghost" id="quitBtn">그만</button>
+        <button class="btn ghost small" id="restartBtn">처음부터</button>
+        <button class="btn ghost small" id="pauseSetBtn">설정</button>
+        <button class="btn ghost small" id="quitBtn">그만</button>
       </div>
     </section>
+
+    <div id="countdown" hidden><span id="cdNum">3</span></div>
+    <div id="toast" hidden></div>
     <div class="modal" id="modal" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <h2 id="modalTitle">누구로 달릴까</h2>

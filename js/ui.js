@@ -36,6 +36,55 @@ function loadBest(){ try{ return JSON.parse(localStorage.getItem('ggakdugi.best2
 function saveBest(){ try{ localStorage.setItem('ggakdugi.best2',JSON.stringify(best)); }catch(e){} }
 const bestKey=(s,d)=>s.id+'/'+d.id;
 
+/* ===== 설정 ===== */
+const DEFAULT_KEYS=['KeyA','KeyS','KeyK','KeyL'];
+const KEY_LABEL={ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Space:'공백',
+                 Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',BracketLeft:'[',BracketRight:']'};
+function keyLabel(code){
+  if(KEY_LABEL[code]) return KEY_LABEL[code];
+  if(code.startsWith('Key')) return code.slice(3);
+  if(code.startsWith('Digit')) return code.slice(5);
+  return code;
+}
+const SKINS={
+  basic:{name:'기본',     col:['#7BC47F','#A9D9F0','#FFB3C1','#FFD98A'], need:0},
+  milk: {name:'딸기우유', col:['#FFC7D6','#FFA9C0','#F58BA8','#E3淡'.slice(0,7)], need:9},
+  mint: {name:'민트소다', col:['#9FE6CB','#7FD8E8','#A9D9F0','#CBF2E4'], need:13}
+};
+SKINS.milk.col[3]='#E97396';
+let settings={ keys:[...DEFAULT_KEYS], speed:1.0, offset:0,
+               volMusic:1, volBgm:1, volSfx:1, skin:'basic' };
+let LANE_COL=[...SKINS.basic.col];
+function applySkin(){ LANE_COL=[...(SKINS[settings.skin]||SKINS.basic).col]; }
+function laneOfCode(code){ const i=settings.keys.indexOf(code); return i<0?undefined:i; }
+
+/* ===== 도감 보상 ===== */
+const DEX_REWARDS=[
+  {id:'r5',  need:5,  label:'클로버 300',                 apply:()=>{ clover+=300; }},
+  {id:'r9',  need:9,  label:'노트 스킨 · 딸기우유',        apply:()=>{ unlockSkin('milk'); }},
+  {id:'r13', need:13, label:'노트 스킨 · 민트소다, 클로버 500', apply:()=>{ unlockSkin('mint'); clover+=500; }},
+  {id:'r18', need:18, label:'도감 완성! 클로버 1500',      apply:()=>{ clover+=1500; }}
+];
+let claimed=[], skins=['basic'];
+function unlockSkin(id){ if(!skins.includes(id)) skins.push(id); }
+function checkRewards(){
+  const got=[];
+  DEX_REWARDS.forEach(r=>{
+    if(own.size>=r.need && !claimed.includes(r.id)){ claimed.push(r.id); r.apply(); got.push(r); }
+  });
+  if(got.length){ save(); refreshPicks(); showToast('도감 보상!', got.map(r=>r.need+'종 달성 — '+r.label)); }
+}
+function nextReward(){ return DEX_REWARDS.find(r=>!claimed.includes(r.id)); }
+let toastTimer=null;
+function showToast(title, lines){
+  const el=$('toast');
+  el.innerHTML='<h4>'+title+'</h4>'+lines.map(l=>'<p>'+l+'</p>').join('');
+  el.hidden=false;
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ el.hidden=true; }, 4600);
+  arp([660,880,1175],0.09,0.13);
+}
+
 /* ===== 세이브: 클로버 · 보유 캐릭터 ===== */
 const START_OWN=['wool','proud','baby'];
 let clover=1200, own=new Set(START_OWN), pity=0, freshIds=new Set();
@@ -43,12 +92,17 @@ let clover=1200, own=new Set(START_OWN), pity=0, freshIds=new Set();
   try{
     const s=JSON.parse(localStorage.getItem('ggakdugi.save')||'null');
     if(s){ clover=s.clover??1200; pity=s.pity||0;
-           own=new Set((s.own&&s.own.length?s.own:START_OWN)); }
+           own=new Set((s.own&&s.own.length?s.own:START_OWN));
+           claimed=s.claimed||[]; skins=s.skins||['basic'];
+           if(s.settings) settings=Object.assign(settings, s.settings);
+           if(!Array.isArray(settings.keys)||settings.keys.length!==4) settings.keys=[...DEFAULT_KEYS];
+           if(!skins.includes(settings.skin)) settings.skin='basic'; }
   }catch(e){}
   START_OWN.forEach(id=>own.add(id));
+  applySkin();
 })();
 function save(){ try{ localStorage.setItem('ggakdugi.save',
-  JSON.stringify({clover:Math.round(clover), own:[...own], pity})); }catch(e){} }
+  JSON.stringify({clover:Math.round(clover), own:[...own], pity, claimed, skins, settings})); }catch(e){} }
 
 /* ===== 뽑기 ===== */
 const PULL1=110, PULL10=1000;
@@ -81,6 +135,7 @@ function pull(n){
     got.push({c, rank:rk, isNew, refund:isNew?0:REFUND[rk]});
   }
   save();
+  setTimeout(checkRewards, 400);
   return got;
 }
 function cloverReward(grade, mult, combo){
@@ -128,6 +183,12 @@ function dexCard(c2){
   return b;
 }
 function buildDex(body){
+  const bar=document.createElement('div'); bar.className='dexbar';
+  const nx=nextReward(), pct=Math.round(own.size/CHARS.length*100);
+  bar.innerHTML='<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'+
+    '<div class="cap"><span><b>'+own.size+'</b> / '+CHARS.length+' 종</span>'+
+    '<span>'+(nx ? '다음 보상 — '+nx.need+'종에서 '+nx.label : '보상 전부 받음!')+'</span></div>';
+  body.appendChild(bar);
   const wrap=document.createElement('div'); wrap.className='dex';
   ['base','SR','R','N','SSR'].forEach(rk=>{
     const list=CHARS.filter(x=>x.rank===rk), soon=COMING.filter(x=>x.rank===rk);
@@ -212,6 +273,10 @@ function openModal(kind){
         '<span class="nm">'+d.name+'</span><span class="meta">'+d.hint+'<br>노트 '+n+'개 · 점수 x'+d.mult+'</span>',
         ()=>{ diff=d; refreshPicks(); closeModal(); }, d===diff, 'song'));
     });
+  } else if(kind==='settings'){
+    $('modalTitle').textContent='설정';
+    $('modalHint').textContent='';
+    buildSettings(body);
   } else if(kind==='gacha'){
     $('modalTitle').textContent='클로버 뽑기';
     $('modalHint').textContent='';
@@ -284,6 +349,82 @@ function renderPullResult(got){
   });
 }
 
+/* ===== 설정 화면 ===== */
+let keyWait=-1;
+function buildSettings(body){
+  const wrap=document.createElement('div'); wrap.className='setlist'; body.appendChild(wrap);
+  const row=(title,val,inner,hint)=>{
+    const d=document.createElement('div'); d.className='setrow';
+    d.innerHTML='<div class="lbl"><b>'+title+'</b><span>'+val+'</span></div>'+inner+
+                (hint?'<div class="hint">'+hint+'</div>':'');
+    wrap.appendChild(d); return d;
+  };
+
+  // 키 바꾸기
+  const kr=row('키 바꾸기','누르면 새 키를 받아요',
+    '<div class="keyrow">'+settings.keys.map((k,i)=>
+      '<button class="keybtn" data-i="'+i+'" type="button">'+keyLabel(k)+
+      '<small>'+(i+1)+'번째 줄</small></button>').join('')+'</div>',
+    '왼쪽부터 순서대로예요. 방향키·기호키도 됩니다.');
+  kr.querySelectorAll('.keybtn').forEach(btn=>{
+    btn.onclick=()=>{
+      kr.querySelectorAll('.keybtn').forEach(b=>b.classList.remove('wait'));
+      btn.classList.add('wait'); btn.textContent='...'; keyWait=+btn.dataset.i;
+    };
+  });
+
+  // 노트 속도
+  const sr=row('노트 속도','x'+settings.speed.toFixed(1),
+    '<input type="range" id="setSpeed" min="0.6" max="2" step="0.1" value="'+settings.speed+'">',
+    '높이면 노트가 빨리 내려와서 타이밍 보기가 쉬워져요.');
+  sr.querySelector('#setSpeed').oninput=e=>{
+    settings.speed=+e.target.value; sr.querySelector('.lbl span').textContent='x'+settings.speed.toFixed(1); save();
+  };
+
+  // 싱크
+  const or_=row('싱크 보정', settings.offset+' ms',
+    '<input type="range" id="setOffset" min="-150" max="150" step="5" value="'+settings.offset+'">',
+    '노트가 소리보다 빨리 오면 −쪽, 늦게 오면 +쪽으로 옮기세요.');
+  or_.querySelector('#setOffset').oninput=e=>{
+    settings.offset=+e.target.value; or_.querySelector('.lbl span').textContent=settings.offset+' ms'; save();
+  };
+
+  // 볼륨 3개
+  [['volMusic','노래 볼륨'],['volBgm','배경음 볼륨'],['volSfx','효과음 볼륨']].forEach(([k,label])=>{
+    const vr=row(label, Math.round(settings[k]*100)+'%',
+      '<input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'">');
+    vr.querySelector('input').oninput=e=>{
+      settings[k]=+e.target.value/100;
+      vr.querySelector('.lbl span').textContent=e.target.value+'%';
+      applyVolumes(); save();
+      if(k==='volSfx') uiClick();
+    };
+  });
+
+  // 노트 스킨
+  const sk=row('노트 색','도감을 모으면 늘어나요',
+    '<div class="skinrow">'+Object.entries(SKINS).map(([id,s])=>{
+      const has=skins.includes(id);
+      return '<button class="skinbtn" data-s="'+id+'" type="button"'+(has?'':' disabled')+
+        ' aria-pressed="'+(settings.skin===id)+'">'+
+        '<span class="nm">'+s.name+'</span><span class="swatch">'+
+        s.col.map(c2=>'<i style="background:'+c2+'"></i>').join('')+'</span>'+
+        '<small>'+(has?'보유':'도감 '+s.need+'종')+'</small></button>';
+    }).join('')+'</div>');
+  sk.querySelectorAll('.skinbtn').forEach(btn=>{
+    if(btn.disabled) return;
+    btn.onclick=()=>{ settings.skin=btn.dataset.s; applySkin(); save(); openModal('settings'); };
+  });
+
+  // 되돌리기
+  const rs=document.createElement('button');
+  rs.className='btn ghost small'; rs.type='button'; rs.textContent='기본값으로';
+  rs.onclick=()=>{ settings.keys=[...DEFAULT_KEYS]; settings.speed=1; settings.offset=0;
+    settings.volMusic=settings.volBgm=settings.volSfx=1; settings.skin='basic';
+    applySkin(); applyVolumes(); save(); openModal('settings'); };
+  wrap.appendChild(rs);
+}
+
 /* ===== 뽑기 화면 ===== */
 function buildGacha(body){
   const wrap=document.createElement('div'); wrap.className='gacha';
@@ -315,7 +456,7 @@ function buildGacha(body){
 function show(screen){
   [titleScreen,resultScreen,pauseScreen].forEach(s=>s.hidden = s!==screen);
   pauseBtn.hidden = !!screen;
-  if(screen!==titleScreen) modal.hidden=true, modalOpen=null;
+  if(screen!==titleScreen && screen!==pauseScreen){ modal.hidden=true; modalOpen=null; }
 }
 function toTitle(){ mode='title'; show(titleScreen); refreshPicks(); homeBar.hidden=true; bgmStart(); }
 function enterHub(){
@@ -334,7 +475,7 @@ function startGame(){
   initAudio(); bgmStop(); if(ctx.state==='suspended') ctx.resume();
   notes=buildChart(song,diff.id);
   events=buildEvents(song); evIndex=0;
-  APPROACH=diff.approach;
+  APPROACH=diff.approach/settings.speed;
   WIN={perfect:BASE_WIN.perfect*diff.wmul, great:BASE_WIN.great*diff.wmul, good:BASE_WIN.good*diff.wmul};
   score=0; combo=0; maxCombo=0; tally={perfect:0,great:0,good:0,miss:0}; accSum=0;
   fx=[]; texts=[]; parts=[]; flyers=[]; lastSection=-1;
@@ -367,13 +508,35 @@ function endGame(){
   refreshPicks(); bgmStart();
   show(resultScreen);
 }
-function pause(){ if(mode!=='play') return; mode='pause'; show(pauseScreen); if(ctx) ctx.suspend(); }
-function resumePlay(){ if(mode!=='pause') return; mode='play'; show(null); if(ctx) ctx.resume(); }
+function pause(){
+  if(mode!=='play') return;
+  mode='pause'; show(pauseScreen);
+  $('pauseInfo').textContent = song.title+' · '+diff.name+' · '+
+    Math.round(score).toLocaleString('ko-KR')+'점 · '+combo+'콤보';
+  if(ctx) ctx.suspend();
+}
+let cdTimer=null;
+function resumePlay(){
+  if(mode!=='pause' || cdTimer) return;
+  pauseScreen.hidden=true; modal.hidden=true; modalOpen=null;
+  const cd=$('countdown'), num=$('cdNum');
+  const pop=()=>{ num.style.animation='none'; void num.offsetWidth; num.style.animation=''; };
+  let n=3; cd.hidden=false; num.textContent=n; pop(); blip(660,0.1);
+  const tick=()=>{
+    n--;
+    if(n>0){ num.textContent=n; pop(); blip(660+(3-n)*120,0.1); cdTimer=setTimeout(tick,650); }
+    else{
+      num.textContent='시작!'; pop(); blip(1180,0.13);
+      cdTimer=setTimeout(()=>{ cd.hidden=true; cdTimer=null; mode='play'; show(null);
+                               if(ctx) ctx.resume(); }, 480);
+    }
+  };
+  cdTimer=setTimeout(tick,650);
+}
 
 /* ===== 판정 ===== */
 /* 4키 낙하형 좌표 */
-const LANE_KEYS=['A','S','K','L'];
-const LANE_COL=['#7BC47F','#A9D9F0','#FFB3C1','#FFD98A'];
+
 function fieldW(){ return Math.min(W*(W<560?0.78:0.60), H*0.80, 430); }
 function fieldX(){ return (W-fieldW())/2; }
 function laneW(){ return fieldW()/4; }
@@ -423,8 +586,7 @@ function miss(n){
 
 /* ===== 입력 ===== */
 const KMAP={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ArrowUp:'w',ArrowLeft:'a',ArrowDown:'s',ArrowRight:'d'};
-const LANE_CODE={KeyA:0,KeyS:1,KeyK:2,KeyL:3,
-                 ArrowLeft:0,ArrowDown:1,ArrowUp:2,ArrowRight:3};
+
 addEventListener('keydown',e=>{
   if(mode==='hub' && !modalOpen){
     if(KMAP[e.code]){ e.preventDefault(); keys[KMAP[e.code]]=true; hub.target=null; return; }
@@ -432,16 +594,21 @@ addEventListener('keydown',e=>{
       e.preventDefault(); if(hub.near) hub.near.act(); return; }
     if(e.code==='Escape'){ toTitle(); return; }
   }
-  if(mode==='hub' && modalOpen && e.code==='Escape'){ closeModal(); return; }
+  if(modalOpen && e.code==='Escape'){ closeModal(); return; }
   if(e.repeat) return;
   if(mode==='cut'){
     if(e.code==='Escape'){ e.preventDefault(); skipCut(); }
     else if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); advanceCut(); }
     return;
   }
-  if(mode==='play' && LANE_CODE[e.code]!==undefined && !modalOpen){
+  if(keyWait>=0 && modalOpen==='settings'){          // 키 바꾸는 중
     e.preventDefault();
-    const ln=LANE_CODE[e.code]; laneHold[ln]=true; hit(ln); return;
+    if(e.code!=='Escape'){ settings.keys[keyWait]=e.code; save(); }
+    keyWait=-1; openModal('settings'); return;
+  }
+  if(mode==='play' && !modalOpen){
+    const ln=laneOfCode(e.code);
+    if(ln!==undefined){ e.preventDefault(); laneHold[ln]=true; hit(ln); return; }
   }
   if(e.code==='Space'){
     e.preventDefault();
@@ -455,7 +622,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{
   if(KMAP[e.code]) keys[KMAP[e.code]]=false;
-  if(LANE_CODE[e.code]!==undefined) laneHold[LANE_CODE[e.code]]=false;
+  const ln=laneOfCode(e.code); if(ln!==undefined) laneHold[ln]=false;
 });
 addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
 cv.addEventListener('pointerdown',e=>{
@@ -497,6 +664,9 @@ $('startBtn').onclick=enterHub;
 $('retryBtn').onclick=startGame;
 $('selectBtn').onclick=enterHub;
 $('resumeBtn').onclick=resumePlay;
+$('restartBtn').onclick=()=>{ if(ctx) ctx.resume(); startGame(); };
+$('pauseSetBtn').onclick=()=>openModal('settings');
+$('homeSetBtn').onclick=()=>openModal('settings');
 $('quitBtn').onclick=()=>{ show(null); endGame(); };
 pauseBtn.onclick=pause;
 $('homeTitleBtn').onclick=toTitle;

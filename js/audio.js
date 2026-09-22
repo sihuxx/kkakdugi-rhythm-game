@@ -2,12 +2,21 @@
 /* 소리 — Web Audio로 반주와 효과음을 직접 연주 — 꺅두기 러닝비트 */
 
 /* ===== 소리 ===== */
-let ctx=null, master=null, musicGain=null, noiseBuf=null;
+let ctx=null, master=null, musicGain=null, sfxGain=null, noiseBuf=null;
 function initAudio(){
   if(ctx) return;
   ctx = new (window.AudioContext||window.webkitAudioContext)();
   master = ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
   musicGain = ctx.createGain(); musicGain.gain.value=0.5; musicGain.connect(master);
+  sfxGain   = ctx.createGain(); sfxGain.gain.value=1.0;   sfxGain.connect(master);
+  applyVolumes();
+}
+/* 설정의 볼륨을 실제 믹서에 반영 */
+function applyVolumes(){
+  if(!ctx) return;
+  musicGain.gain.value = 0.5*settings.volMusic;
+  sfxGain.gain.value   = 1.0*settings.volSfx;
+  if(BGM.on && BGM.gain) BGM.gain.gain.setTargetAtTime(0.5*settings.volBgm, ctx.currentTime, 0.1);
 }
 function tone(time, freq, dur, o){
   const osc=ctx.createOscillator(), g=ctx.createGain(), f=ctx.createBiquadFilter();
@@ -50,16 +59,16 @@ function hitSound(lane, v){
   o.frequency.exponentialRampToValueAtTime(base*0.985,t+0.14);
   f.type='lowpass'; f.frequency.value=cut;
   g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.19);
-  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.22);
+  o.connect(f); f.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.22);
   const o2=ctx.createOscillator(), g2=ctx.createGain();      // 배음
   o2.type='triangle'; o2.frequency.setValueAtTime(base*2.01,t);
   g2.gain.setValueAtTime(vol*0.35,t); g2.gain.exponentialRampToValueAtTime(0.0001,t+0.10);
-  o2.connect(g2); g2.connect(master); o2.start(t); o2.stop(t+0.12);
+  o2.connect(g2); g2.connect(sfxGain); o2.start(t); o2.stop(t+0.12);
   if(v!=='good'){                                            // 톡 하는 어택
     const s=ctx.createBufferSource(), gn=ctx.createGain(), fn=ctx.createBiquadFilter();
     s.buffer=noise(); fn.type='highpass'; fn.frequency.value=v==='perfect'?4200:2800;
     gn.gain.setValueAtTime(vol*0.45,t); gn.gain.exponentialRampToValueAtTime(0.0001,t+0.028);
-    s.connect(fn); fn.connect(gn); gn.connect(master); s.start(t); s.stop(t+0.05);
+    s.connect(fn); fn.connect(gn); gn.connect(sfxGain); s.start(t); s.stop(t+0.05);
   }
 }
 function missSound(){
@@ -68,7 +77,7 @@ function missSound(){
   o.type='triangle'; o.frequency.setValueAtTime(190,t); o.frequency.exponentialRampToValueAtTime(95,t+0.18);
   f.type='lowpass'; f.frequency.value=900;
   g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
-  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.26);
+  o.connect(f); f.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.26);
 }
 /* 버튼 누르는 소리 — 똑 */
 function uiClick(){
@@ -77,7 +86,7 @@ function uiClick(){
   o.type='sine'; o.frequency.setValueAtTime(1180,t); o.frequency.exponentialRampToValueAtTime(780,t+0.06);
   f.type='lowpass'; f.frequency.value=4200;
   g.gain.setValueAtTime(0.075,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
-  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.1);
+  o.connect(f); f.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.1);
 }
 
 /* 배경음 — 타이틀·집·결과 화면에서 잔잔하게 도는 8마디 루프 */
@@ -96,7 +105,7 @@ function bgmTone(t,f,dur,vol,type,cut){
 function bgmStart(){
   if(!ctx || BGM.on) return;
   BGM.gain=ctx.createGain(); BGM.gain.gain.value=0.0001; BGM.gain.connect(master);
-  BGM.gain.gain.setTargetAtTime(0.5, ctx.currentTime, 0.6);
+  BGM.gain.gain.setTargetAtTime(0.5*settings.volBgm, ctx.currentTime, 0.6);
   BGM.on=true; BGM.next=ctx.currentTime+0.15; BGM.bar=0;
   BGM.timer=setInterval(bgmTick,150); bgmTick();
 }
@@ -126,7 +135,7 @@ function blip(freq,vol){ if(!ctx) return;
   const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
   o.type='triangle'; o.frequency.setValueAtTime(freq,t); o.frequency.exponentialRampToValueAtTime(freq*1.6,t+0.05);
   g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);
-  o.connect(g); g.connect(master); o.start(t); o.stop(t+0.14); }
+  o.connect(g); g.connect(sfxGain||master); o.start(t); o.stop(t+0.14); }
 
 function sweepUp(dur, rank){            // 뽑기 전 긴장감 — 올라가는 소리
   if(!ctx) return;
@@ -137,12 +146,12 @@ function sweepUp(dur, rank){            // 뽑기 전 긴장감 — 올라가는
   f.type='lowpass'; f.frequency.setValueAtTime(700,t); f.frequency.exponentialRampToValueAtTime(5000,t+dur);
   g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16,t+dur*0.8);
   g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.12);
-  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.2);
+  o.connect(f); f.connect(g); g.connect(sfxGain||master); o.start(t); o.stop(t+dur+0.2);
   if(rank!=='N'){                        // 심장 두근거림
     for(let i=0;i<4;i++){ const k=ctx.createOscillator(), kg=ctx.createGain(), tt=t+i*(dur/4);
       k.type='sine'; k.frequency.setValueAtTime(90,tt); k.frequency.exponentialRampToValueAtTime(45,tt+0.12);
       kg.gain.setValueAtTime(0.3,tt); kg.gain.exponentialRampToValueAtTime(0.0001,tt+0.18);
-      k.connect(kg); kg.connect(master); k.start(tt); k.stop(tt+0.2); }
+      k.connect(kg); kg.connect(sfxGain||master); k.start(tt); k.stop(tt+0.2); }
   }
 }
 function arp(freqs, gap, vol, type){    // 등급별 팡파르
@@ -152,7 +161,7 @@ function arp(freqs, gap, vol, type){    // 등급별 팡파르
     const o=ctx.createOscillator(), g=ctx.createGain(), t=t0+i*gap;
     o.type=type||'triangle'; o.frequency.setValueAtTime(f,t);
     g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.26);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.3);
+    o.connect(g); g.connect(sfxGain||master); o.start(t); o.stop(t+0.3);
   });
 }
 function shimmer(){                      // 아주 귀함 반짝임
@@ -161,7 +170,7 @@ function shimmer(){                      // 아주 귀함 반짝임
   s.buffer=noise(); f.type='bandpass'; f.frequency.setValueAtTime(3000,t);
   f.frequency.exponentialRampToValueAtTime(9000,t+0.5); f.Q.value=2.2;
   g.gain.setValueAtTime(0.14,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
-  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+0.65);
+  s.connect(f); f.connect(g); g.connect(sfxGain||master); s.start(t); s.stop(t+0.65);
 }
 
 function buildEvents(song){
@@ -191,7 +200,7 @@ function buildEvents(song){
 }
 let songStart=0;
 function at(t){ return songStart+t; }
-function nowT(){ return ctx ? ctx.currentTime-songStart : 0; }
+function nowT(){ return ctx ? ctx.currentTime-songStart + settings.offset/1000 : 0; }
 
 /* 곡 카드 미리듣기 */
 let previewUntil=0;

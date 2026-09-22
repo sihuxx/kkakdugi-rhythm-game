@@ -45,7 +45,7 @@ function laneField(t,th){
     g.beginPath(); g.arc(cx,jy,r,0,6.3); g.stroke();
     g.font='700 '+Math.round(lw*0.34)+'px "Gaegu", sans-serif';
     g.textAlign='center'; g.fillStyle=th.ink; g.globalAlpha=laneHold[i]?1:0.55;
-    g.fillText(LANE_KEYS[i], cx, jy+lw*0.72); g.globalAlpha=1;
+    g.fillText(keyLabel(settings.keys[i]), cx, jy+lw*0.72); g.globalAlpha=1;
   }
   g.restore();
 }
