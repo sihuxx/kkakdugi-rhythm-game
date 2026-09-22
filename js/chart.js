@@ -39,15 +39,20 @@ function buildChart(song, diffId){
   }
   picked.sort((a,b)=>(a.bi*S+a.st)-(b.bi*S+b.st));
 
-  const notes=[]; let prevM=null, prevJump=false;
+  // 음 높이로 레인(A·S·K·L) 배정 — 낮은 음이 왼쪽
+  const ms=picked.map(o=>o.m), lo=Math.min(...ms), hi=Math.max(...ms), span=Math.max(1,hi-lo);
+  const notes=[]; let prevM=null, lastLane=-1, rep=0;
   picked.forEach(o=>{
-    let type = 'tap';
-    if(o.tag==='jump') type='jump';
+    let type='tap';
+    if(o.tag==='jump') type='star';
     else if(o.len>=3) type='hold';
-    else if((diffId==='hard'||diffId==='nightmare') && prevM!==null && o.m-prevM>=4 && !prevJump && !o.fill) type='jump';
     if(diffId==='easy' && type==='hold' && o.len<4) type='tap';
-    prevM=o.m; prevJump=(type==='jump');
-    notes.push({ t:o.bi*song.barDur + o.st*STEP, type,
+
+    let lane=Math.min(3, Math.floor((o.m-lo)/span*4));
+    if(lane===lastLane){ rep++; if(rep>=3){ lane=(lane+1)%4; rep=0; } } else rep=0;
+    lastLane=lane; prevM=o.m;
+
+    notes.push({ t:o.bi*song.barDur + o.st*STEP, lane, type,
                  dur: type==='hold' ? o.len*STEP*0.9 : 0,
                  judged:false, holding:false, done:false, verdict:null, seed:Math.random()*6.28 });
   });

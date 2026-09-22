@@ -27,7 +27,8 @@ let mode='title';
 let char=CHARS[0], song=SONGS[0], diff=DIFFS[0];
 let notes=[], events=[], evIndex=0, WIN={...BASE_WIN}, APPROACH=2.0;
 let score=0, combo=0, maxCombo=0, tally={perfect:0,good:0,ok:0,miss:0}, accSum=0;
-let charState='run', charTimer=0, jumpT=0, holdKey=false;
+let charState='run', charTimer=0, jumpT=0, hitBounce=0;
+const laneHold=[false,false,false,false], laneFlash=[0,0,0,0], touchLane={};
 let fx=[], texts=[], parts=[], stars=[], flyers=[], lastSection=-1;
 let best=loadBest();
 
@@ -376,20 +377,28 @@ function pause(){ if(mode!=='play') return; mode='pause'; show(pauseScreen); if(
 function resumePlay(){ if(mode!=='pause') return; mode='play'; show(null); if(ctx) ctx.resume(); }
 
 /* ===== 판정 ===== */
-function judgeX(){ return W*0.26; }
-function charX(){ return W*0.115; }
-function groundY(){ return H*0.76; }
-function laneY(type){ return type==='jump' ? groundY()-H*0.34 : groundY()-H*0.11; }
-function noteX(t){ return judgeX() + (t-nowT())*((W-judgeX()+90)/APPROACH); }
+/* 4키 낙하형 좌표 */
+const LANE_KEYS=['A','S','K','L'];
+const LANE_COL=['#7BC47F','#A9D9F0','#FFB3C1','#FFD98A'];
+function fieldW(){ return Math.min(W*(W<560?0.78:0.60), H*0.80, 430); }
+function fieldX(){ return (W-fieldW())/2; }
+function laneW(){ return fieldW()/4; }
+function laneX(i){ return fieldX()+laneW()*(i+0.5); }
+function fieldTop(){ return H*0.04; }
+function judgeY(){ return H*0.80; }
+function noteSpeed(){ return (judgeY()-fieldTop()+60)/APPROACH; }
+function noteY(t){ return judgeY() - (t-nowT())*noteSpeed(); }
+function charX(){ return fieldX()*0.5; }
+function groundY(){ return H*0.86; }
 
-function hit(kind){
+function hit(lane){
   if(mode!=='play') return;
+  laneFlash[lane]=1;
   const t=nowT(); let target=null, bd=999;
   for(const n of notes){
     if(n.judged) continue;
     if(n.t-t>WIN.ok+0.05) break;
-    const ok = kind==='jump' ? n.type==='jump' : n.type!=='jump';
-    if(!ok) continue;
+    if(n.lane!==lane) continue;
     const d=Math.abs(n.t-t);
     if(d<=WIN.ok && d<bd){ bd=d; target=n; }
   }
@@ -400,23 +409,27 @@ function hit(kind){
   combo++; maxCombo=Math.max(maxCombo,combo);
   tally[v]++; accSum+=VAL[v];
   score += 100*VAL[v]*(1+Math.min(combo/10*0.1,1.0))*diff.mult;
-  const ly=laneY(target.type);
-  fx.push({x:judgeX(),y:ly,r:10,life:1,kind:v});
+  const lx=laneX(lane), ly=judgeY();
+  fx.push({x:lx,y:ly,r:10,life:1,kind:v});
   for(let i=0;i<(v==='perfect'?8:4);i++)
-    fx.push({x:judgeX(),y:ly,life:1,kind:'dust',vx:(Math.random()-.5)*160,vy:-40-Math.random()*130,r:3+Math.random()*3});
-  texts.push({x:judgeX(),y:ly-28,life:1,s:LABEL[v],big:v==='perfect'});
-  if(target.type==='jump'){ charState='jump'; jumpT=0; } else charState='run';
+    fx.push({x:lx,y:ly,life:1,kind:'dust',vx:(Math.random()-.5)*160,vy:-40-Math.random()*130,r:3+Math.random()*3});
+  texts.length=0;
+  texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL[v],big:v==='perfect'});
+  if(target.type==='star'){ charState='jump'; jumpT=0; } else { charState='run'; hitBounce=1; }
   blip(v==='perfect'?880:v==='good'?740:600, v==='perfect'?0.12:0.08);
 }
 function miss(n){
   n.judged=true; n.done=true; n.verdict='miss';
   combo=0; tally.miss++;
-  texts.push({x:judgeX(),y:laneY(n.type)-26,life:1,s:LABEL.miss});
+  texts.length=0;
+  texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL.miss});
   charState='fall'; charTimer=0.7;
 }
 
 /* ===== 입력 ===== */
 const KMAP={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ArrowUp:'w',ArrowLeft:'a',ArrowDown:'s',ArrowRight:'d'};
+const LANE_CODE={KeyA:0,KeyS:1,KeyK:2,KeyL:3,
+                 ArrowLeft:0,ArrowDown:1,ArrowUp:2,ArrowRight:3};
 addEventListener('keydown',e=>{
   if(mode==='hub' && !modalOpen){
     if(KMAP[e.code]){ e.preventDefault(); keys[KMAP[e.code]]=true; hub.target=null; return; }
@@ -431,13 +444,15 @@ addEventListener('keydown',e=>{
     else if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); advanceCut(); }
     return;
   }
+  if(mode==='play' && LANE_CODE[e.code]!==undefined && !modalOpen){
+    e.preventDefault();
+    const ln=LANE_CODE[e.code]; laneHold[ln]=true; hit(ln); return;
+  }
   if(e.code==='Space'){
     e.preventDefault();
     if(modalOpen) return;
     if(mode==='title'||mode==='result') startGame();
-    else if(mode==='play'){ holdKey=true; hit('tap'); }
-  } else if(e.code==='ArrowUp'){ if(!modalOpen){ e.preventDefault(); hit('jump'); } }
-  else if(e.code==='Escape'){
+  } else if(e.code==='Escape'){
     if(modalOpen) closeModal();
     else if(mode==='play') pause();
     else resumePlay();
@@ -445,7 +460,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{
   if(KMAP[e.code]) keys[KMAP[e.code]]=false;
-  if(e.code==='Space') holdKey=false;
+  if(LANE_CODE[e.code]!==undefined) laneHold[LANE_CODE[e.code]]=false;
 });
 addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
 cv.addEventListener('pointerdown',e=>{
@@ -460,13 +475,15 @@ cv.addEventListener('pointerdown',e=>{
     return;
   }
   if(mode!=='play') return;
-  cv.setPointerCapture(e.pointerId);
   const r=cv.getBoundingClientRect();
-  if((e.clientY-r.top) < r.height*0.45) hit('jump');
-  else { holdKey=true; hit('tap'); }
+  const mx=(e.clientX-r.left)/r.width*W;
+  const ln=Math.max(0,Math.min(3,Math.floor((mx-fieldX())/laneW())));
+  touchLane[e.pointerId]=ln; laneHold[ln]=true; hit(ln);
 });
-cv.addEventListener('pointerup',()=>{ holdKey=false; });
-cv.addEventListener('pointercancel',()=>{ holdKey=false; });
+cv.addEventListener('pointerup',e=>{ const ln=touchLane[e.pointerId];
+  if(ln!==undefined){ laneHold[ln]=false; delete touchLane[e.pointerId]; } });
+cv.addEventListener('pointercancel',e=>{ const ln=touchLane[e.pointerId];
+  if(ln!==undefined){ laneHold[ln]=false; delete touchLane[e.pointerId]; } });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mode==='play') pause(); });
 
 $('pickChar').onclick=()=>openModal('char');
