@@ -19,14 +19,14 @@ function resize(){
 new ResizeObserver(resize).observe(cv);
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const BASE_WIN={perfect:0.06,good:0.12,ok:0.18};
-const VAL={perfect:1,good:0.6,ok:0.2};
-const LABEL={perfect:'딱딱!',good:'좋아',ok:'아쉬워',miss:'앗'};
+const BASE_WIN={perfect:0.06,great:0.12,good:0.18};
+const VAL={perfect:1,great:0.6,good:0.2};
+const LABEL={perfect:'PERFECT',great:'GREAT',good:'GOOD',miss:'MISS'};
 
 let mode='title';
 let char=CHARS[0], song=SONGS[0], diff=DIFFS[0];
 let notes=[], events=[], evIndex=0, WIN={...BASE_WIN}, APPROACH=2.0;
-let score=0, combo=0, maxCombo=0, tally={perfect:0,good:0,ok:0,miss:0}, accSum=0;
+let score=0, combo=0, maxCombo=0, tally={perfect:0,great:0,good:0,miss:0}, accSum=0;
 let charState='run', charTimer=0, jumpT=0, hitBounce=0;
 const laneHold=[false,false,false,false], laneFlash=[0,0,0,0], touchLane={};
 let fx=[], texts=[], parts=[], stars=[], flyers=[], lastSection=-1;
@@ -97,13 +97,7 @@ const CLOVER_SVG='<svg class="cv" viewBox="0 0 20 20" aria-hidden="true">'+
   '<path d="M10 11 L10 19" stroke="#7BC47F" stroke-width="1.6" fill="none"/></svg>';
 
 function refreshPicks(){
-  $('pickChar').querySelector('.vl').textContent = char.name;
-  $('pickSong').querySelector('.vl').textContent = song.title;
-  $('pickDiff').querySelector('.vl').textContent = diff.name;
   $('titleArt').src = SRC[char.run];
-  const bs = best[bestKey(song,diff)];
-  $('tagline').textContent = song.bpm+' BPM · 노트 '+buildChart(song,diff.id).length+'개 · '+
-    (bs ? '최고 '+bs.toLocaleString('ko-KR') : '기록 없음');
   $('wallet').innerHTML = CLOVER_SVG+'<b>'+Math.round(clover).toLocaleString('ko-KR')+'</b>'+
     '<span>도감 '+own.size+'/'+CHARS.length+'</span>';
 }
@@ -240,12 +234,12 @@ function playCutscene(got){
   lastPull=got;
   const top = got.some(r=>r.rank==='SR') ? 'SR' : got.some(r=>r.rank==='R') ? 'R' : 'N';
   modal.hidden=true; modalOpen=null;
-  show(null); pauseBtn.hidden=true; homeBar.hidden=true;
+  show(null); pauseBtn.hidden=true; homeBar.hidden=true; bgmStop();
   $('skipBtn').hidden=false; $('tapHint').hidden=false;
   mode='cut';
   startCut(top, got, ()=>{
     $('skipBtn').hidden=true; $('tapHint').hidden=true;
-    mode='hub'; show(null); homeBar.hidden=false; refreshPicks(); refreshHomeBar();
+    mode='hub'; show(null); homeBar.hidden=false; refreshPicks(); refreshHomeBar(); bgmStart();
     openModal('gacha');
   });
 }
@@ -323,10 +317,10 @@ function show(screen){
   pauseBtn.hidden = !!screen;
   if(screen!==titleScreen) modal.hidden=true, modalOpen=null;
 }
-function toTitle(){ mode='title'; show(titleScreen); refreshPicks(); homeBar.hidden=true; }
+function toTitle(){ mode='title'; show(titleScreen); refreshPicks(); homeBar.hidden=true; bgmStart(); }
 function enterHub(){
   initAudio && initAudio();
-  mode='hub'; show(null); pauseBtn.hidden=true; homeBar.hidden=false;
+  mode='hub'; show(null); pauseBtn.hidden=true; homeBar.hidden=false; bgmStart();
   hub.x=0.5; hub.y=0.72; hub.target=null; hub.autoOpen=null;
   refreshHomeBar();
 }
@@ -337,12 +331,12 @@ function refreshHomeBar(){
 
 function startGame(){
   closeModal(); homeBar.hidden=true;
-  initAudio(); if(ctx.state==='suspended') ctx.resume();
+  initAudio(); bgmStop(); if(ctx.state==='suspended') ctx.resume();
   notes=buildChart(song,diff.id);
   events=buildEvents(song); evIndex=0;
   APPROACH=diff.approach;
-  WIN={perfect:BASE_WIN.perfect*diff.wmul, good:BASE_WIN.good*diff.wmul, ok:BASE_WIN.ok*diff.wmul};
-  score=0; combo=0; maxCombo=0; tally={perfect:0,good:0,ok:0,miss:0}; accSum=0;
+  WIN={perfect:BASE_WIN.perfect*diff.wmul, great:BASE_WIN.great*diff.wmul, good:BASE_WIN.good*diff.wmul};
+  score=0; combo=0; maxCombo=0; tally={perfect:0,great:0,good:0,miss:0}; accSum=0;
   fx=[]; texts=[]; parts=[]; flyers=[]; lastSection=-1;
   stars=Array.from({length:40},()=>({x:Math.random(),y:Math.random()*0.55,r:Math.random()*1.6+0.7,p:Math.random()*6.3}));
   charState='run'; charTimer=0;
@@ -353,14 +347,14 @@ function endGame(){
   mode='result';
   const total=notes.length||1, acc=Math.round((accSum/total)*100);
   let grade;
-  if(tally.miss===0&&tally.ok===0) grade='네잎클로버';
+  if(tally.miss===0&&tally.good===0) grade='네잎클로버';
   else if(acc>=90) grade='세잎';
   else if(acc>=70) grade='잎사귀';
   else grade='새싹';
   $('gradeText').textContent=grade;
   $('scoreText').textContent=Math.round(score).toLocaleString('ko-KR');
-  $('tPerfect').textContent=tally.perfect; $('tGood').textContent=tally.good;
-  $('tOk').textContent=tally.ok; $('tMiss').textContent=tally.miss;
+  $('tPerfect').textContent=tally.perfect; $('tGreat').textContent=tally.great;
+  $('tGood').textContent=tally.good; $('tMiss').textContent=tally.miss;
   $('tCombo').textContent=maxCombo; $('tAcc').textContent=acc+'%';
   const k=bestKey(song,diff), prev=best[k]||0, isNew=score>prev;
   if(isNew){ best[k]=Math.round(score); saveBest(); }
@@ -370,7 +364,7 @@ function endGame(){
   clover+=gain; save();
   $('rewardText').innerHTML=CLOVER_SVG+'<b>+'+gain+'</b> 클로버를 받았어요';
   $('resultArt').src = grade==='네잎클로버' ? SRC.clover : SRC[char.run];
-  refreshPicks();
+  refreshPicks(); bgmStart();
   show(resultScreen);
 }
 function pause(){ if(mode!=='play') return; mode='pause'; show(pauseScreen); if(ctx) ctx.suspend(); }
@@ -397,13 +391,13 @@ function hit(lane){
   const t=nowT(); let target=null, bd=999;
   for(const n of notes){
     if(n.judged) continue;
-    if(n.t-t>WIN.ok+0.05) break;
+    if(n.t-t>WIN.good+0.05) break;
     if(n.lane!==lane) continue;
     const d=Math.abs(n.t-t);
-    if(d<=WIN.ok && d<bd){ bd=d; target=n; }
+    if(d<=WIN.good && d<bd){ bd=d; target=n; }
   }
   if(!target) return;
-  const v = bd<=WIN.perfect?'perfect' : bd<=WIN.good?'good':'ok';
+  const v = bd<=WIN.perfect?'perfect' : bd<=WIN.great?'great':'good';
   target.judged=true; target.verdict=v;
   if(target.type==='hold') target.holding=true; else target.done=true;
   combo++; maxCombo=Math.max(maxCombo,combo);
@@ -415,14 +409,15 @@ function hit(lane){
     fx.push({x:lx,y:ly,life:1,kind:'dust',vx:(Math.random()-.5)*160,vy:-40-Math.random()*130,r:3+Math.random()*3});
   texts.length=0;
   texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL[v],big:v==='perfect'});
-  if(target.type==='star'){ charState='jump'; jumpT=0; } else { charState='run'; hitBounce=1; }
-  blip(v==='perfect'?880:v==='good'?740:600, v==='perfect'?0.12:0.08);
+  if(combo%10===0){ charState='jump'; jumpT=0; } else { charState='run'; hitBounce=1; }
+  hitSound(lane, v);
 }
 function miss(n){
   n.judged=true; n.done=true; n.verdict='miss';
   combo=0; tally.miss++;
   texts.length=0;
   texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL.miss});
+  missSound();
   charState='fall'; charTimer=0.7;
 }
 
@@ -486,11 +481,16 @@ cv.addEventListener('pointercancel',e=>{ const ln=touchLane[e.pointerId];
   if(ln!==undefined){ laneHold[ln]=false; delete touchLane[e.pointerId]; } });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&mode==='play') pause(); });
 
-$('pickChar').onclick=()=>openModal('char');
-$('pickSong').onclick=()=>openModal('song');
-$('pickDiff').onclick=()=>openModal('diff');
-$('gachaBtn').onclick=()=>openModal('gacha');
 $('resultGachaBtn').onclick=()=>{ enterHub(); openModal('gacha'); };
+document.addEventListener('pointerdown',e=>{
+  audioKick();
+  if(e.target.closest('button,.songrow,.dcard,.lv,.cover,.sinfo')) uiClick();
+},true);
+addEventListener('keydown',audioKick,true);
+function audioKick(){
+  initAudio(); if(ctx.state==='suspended') ctx.resume();
+  if(mode==='title'||mode==='hub'||mode==='result') bgmStart();
+}
 $('modalClose').onclick=closeModal;
 modal.addEventListener('pointerdown',e=>{ if(e.target===modal) closeModal(); });
 $('startBtn').onclick=enterHub;

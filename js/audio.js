@@ -38,6 +38,90 @@ function clap(t){ const s=ctx.createBufferSource(),g=ctx.createGain(),f=ctx.crea
   s.buffer=noise(); f.type='bandpass'; f.frequency.value=1700; f.Q.value=1.1;
   g.gain.setValueAtTime(0.16,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.15);
   s.connect(f); f.connect(g); g.connect(musicGain); s.start(t); s.stop(t+0.2); }
+/* 타격음 — 나무 타악기처럼 짧고 동그랗게. 레인마다 음이 다르다 */
+const LANE_HZ=[523.25, 659.25, 783.99, 1046.50];   // 도 미 솔 높은도
+function hitSound(lane, v){
+  if(!ctx) return;
+  const t=ctx.currentTime, base=LANE_HZ[lane]||523;
+  const vol = v==='perfect'?0.17 : v==='great'?0.13 : 0.085;
+  const cut = v==='perfect'?5600 : v==='great'?3200 : 1700;
+  const o=ctx.createOscillator(), g=ctx.createGain(), f=ctx.createBiquadFilter();
+  o.type='sine'; o.frequency.setValueAtTime(base,t);
+  o.frequency.exponentialRampToValueAtTime(base*0.985,t+0.14);
+  f.type='lowpass'; f.frequency.value=cut;
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.19);
+  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.22);
+  const o2=ctx.createOscillator(), g2=ctx.createGain();      // 배음
+  o2.type='triangle'; o2.frequency.setValueAtTime(base*2.01,t);
+  g2.gain.setValueAtTime(vol*0.35,t); g2.gain.exponentialRampToValueAtTime(0.0001,t+0.10);
+  o2.connect(g2); g2.connect(master); o2.start(t); o2.stop(t+0.12);
+  if(v!=='good'){                                            // 톡 하는 어택
+    const s=ctx.createBufferSource(), gn=ctx.createGain(), fn=ctx.createBiquadFilter();
+    s.buffer=noise(); fn.type='highpass'; fn.frequency.value=v==='perfect'?4200:2800;
+    gn.gain.setValueAtTime(vol*0.45,t); gn.gain.exponentialRampToValueAtTime(0.0001,t+0.028);
+    s.connect(fn); fn.connect(gn); gn.connect(master); s.start(t); s.stop(t+0.05);
+  }
+}
+function missSound(){
+  if(!ctx) return;
+  const t=ctx.currentTime, o=ctx.createOscillator(), g=ctx.createGain(), f=ctx.createBiquadFilter();
+  o.type='triangle'; o.frequency.setValueAtTime(190,t); o.frequency.exponentialRampToValueAtTime(95,t+0.18);
+  f.type='lowpass'; f.frequency.value=900;
+  g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
+  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.26);
+}
+/* 버튼 누르는 소리 — 똑 */
+function uiClick(){
+  if(!ctx) return;
+  const t=ctx.currentTime, o=ctx.createOscillator(), g=ctx.createGain(), f=ctx.createBiquadFilter();
+  o.type='sine'; o.frequency.setValueAtTime(1180,t); o.frequency.exponentialRampToValueAtTime(780,t+0.06);
+  f.type='lowpass'; f.frequency.value=4200;
+  g.gain.setValueAtTime(0.075,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+  o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.1);
+}
+
+/* 배경음 — 타이틀·집·결과 화면에서 잔잔하게 도는 8마디 루프 */
+const BGM={on:false, gain:null, next:0, bar:0, timer:null};
+const BGM_CH=[['C3','E3','G3','B3'],['A2','C3','E3','G3'],['F2','A2','C3','E3'],['G2','B2','D3','F3']];
+const BGM_MEL=['E5','D5','C5','G4','A4','C5','D5','E5'];
+function bgmTone(t,f,dur,vol,type,cut){
+  const o=ctx.createOscillator(), g=ctx.createGain(), bf=ctx.createBiquadFilter();
+  o.type=type; o.frequency.value=f; bf.type='lowpass'; bf.frequency.value=cut;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+dur*0.18);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(bf); bf.connect(g); g.connect(BGM.gain);
+  o.start(t); o.stop(t+dur+0.05);
+}
+function bgmStart(){
+  if(!ctx || BGM.on) return;
+  BGM.gain=ctx.createGain(); BGM.gain.gain.value=0.0001; BGM.gain.connect(master);
+  BGM.gain.gain.setTargetAtTime(0.5, ctx.currentTime, 0.6);
+  BGM.on=true; BGM.next=ctx.currentTime+0.15; BGM.bar=0;
+  BGM.timer=setInterval(bgmTick,150); bgmTick();
+}
+function bgmStop(){
+  if(!BGM.on) return;
+  clearInterval(BGM.timer); BGM.on=false;
+  const g0=BGM.gain;
+  try{ g0.gain.cancelScheduledValues(ctx.currentTime);
+       g0.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.25); }catch(e){}
+  setTimeout(()=>{ try{ g0.disconnect(); }catch(e){} }, 1200);
+}
+function bgmTick(){
+  if(!BGM.on) return;
+  const beat=60/84, bar=beat*4;
+  while(BGM.next < ctx.currentTime+0.8){
+    const t=BGM.next, ch=BGM_CH[BGM.bar%4];
+    ch.forEach(n=> bgmTone(t, hz(n), bar*0.96, 0.05, 'triangle', 800));      // 패드
+    for(let i=0;i<4;i++)                                                      // 아르페지오
+      bgmTone(t+i*beat, hz(ch[(i+2)%4])*2, beat*0.55, 0.035, 'sine', 2600);
+    if(BGM.bar%2===0)                                                         // 멜로디 한 음
+      bgmTone(t+beat*2.5, hz(BGM_MEL[BGM.bar%8]), beat*1.1, 0.045, 'triangle', 2000);
+    BGM.next+=bar; BGM.bar++;
+  }
+}
+
 function blip(freq,vol){ if(!ctx) return;
   const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
   o.type='triangle'; o.frequency.setValueAtTime(freq,t); o.frequency.exponentialRampToValueAtTime(freq*1.6,t+0.05);

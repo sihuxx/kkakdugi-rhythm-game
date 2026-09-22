@@ -43,9 +43,7 @@ function buildChart(song, diffId){
   const ms=picked.map(o=>o.m), lo=Math.min(...ms), hi=Math.max(...ms), span=Math.max(1,hi-lo);
   const notes=[]; let prevM=null, lastLane=-1, rep=0;
   picked.forEach(o=>{
-    let type='tap';
-    if(o.tag==='jump') type='star';
-    else if(o.len>=3) type='hold';
+    let type = o.len>=3 ? 'hold' : 'tap';
     if(diffId==='easy' && type==='hold' && o.len<4) type='tap';
 
     let lane=Math.min(3, Math.floor((o.m-lo)/span*4));

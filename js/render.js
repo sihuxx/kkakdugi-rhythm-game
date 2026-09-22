@@ -78,19 +78,10 @@ function drawNotes(t,th){
       const y=noteY(n.t);
       if(y>jy+H*0.18) continue;
       if(y<top-30) continue;
-      if(n.type==='star'){
-        g.save(); g.translate(x,y); g.rotate(t*1.6);
-        g.fillStyle='#FFD98A'; g.strokeStyle=th.ink; g.lineWidth=2.8;
-        g.beginPath();
-        for(let i=0;i<10;i++){ const a=i*Math.PI/5-Math.PI/2, r=i%2?nh*0.42:nh*0.92;
-          i?g.lineTo(Math.cos(a)*r,Math.sin(a)*r):g.moveTo(Math.cos(a)*r,Math.sin(a)*r); }
-        g.closePath(); g.fill(); g.stroke(); g.restore();
-      } else {
-        g.fillStyle=col; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.fill();
-        g.lineWidth=2.8; g.strokeStyle=th.ink; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.stroke();
-        g.globalAlpha=.5; g.fillStyle='#FFFDF6';
-        roundRect(x-nw*0.36,y-nh*0.30,nw*0.72,nh*0.26,nh*0.13); g.fill(); g.globalAlpha=1;
-      }
+      g.fillStyle=col; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.fill();
+      g.lineWidth=2.8; g.strokeStyle=th.ink; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.stroke();
+      g.globalAlpha=.5; g.fillStyle='#FFFDF6';
+      roundRect(x-nw*0.36,y-nh*0.30,nw*0.72,nh*0.26,nh*0.13); g.fill(); g.globalAlpha=1;
     }
   }
 }
@@ -149,7 +140,7 @@ function drawFx(dt,th){
   for(const tx of texts){
     g.globalAlpha=Math.max(0,Math.min(1,tx.life*1.4));
     g.font='700 '+(tx.big?30:24)+'px "Gaegu", sans-serif'; g.textAlign='center';
-    g.fillStyle = tx.s==='앗' ? '#C9A9A9' : th.ink;
+    g.fillStyle = (tx.s==='MISS'||tx.s==='놓쳤다') ? '#C9A9A9' : th.ink;
     g.save(); g.translate(tx.x,tx.y); g.rotate(-0.06); g.fillText(tx.s,0,0); g.restore();
   }
   g.globalAlpha=1;
@@ -639,13 +630,12 @@ function frame(ts){
     const look=t+0.25;
     while(evIndex<events.length && events[evIndex].t<look){ events[evIndex].f(); evIndex++; }
     for(const n of notes){
-      if(!n.judged && t-n.t>WIN.ok) miss(n);
+      if(!n.judged && t-n.t>WIN.good) miss(n);
       if(n.holding && t>=n.t+n.dur){
         n.holding=false; n.done=true; score+=40*diff.mult;
-        combo++; maxCombo=Math.max(maxCombo,combo);
+        combo++; maxCombo=Math.max(maxCombo,combo); hitSound(n.lane,'perfect');
         fx.push({x:laneX(n.lane),y:judgeY(),r:12,life:1,kind:'perfect'});
         texts.length=0; texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:'쓰왜!'});
-        blip(980,0.1);
       }
       if(n.holding && !laneHold[n.lane] && t<n.t+n.dur-0.12){              // 놓으면 그 자리에서 끝
         n.holding=false; n.done=true;
