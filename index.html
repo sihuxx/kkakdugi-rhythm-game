@@ -15,6 +15,7 @@
 <div id="app">
   <div id="stage">
     <canvas id="cv"></canvas>
+    <button id="fsBtn" type="button" title="전체화면">⛶</button>
     <button id="pauseBtn" hidden>일시정지</button>
     <button id="skipBtn" hidden>건너뛰기 ▶▶</button>
     <p id="tapHint" hidden>탭하면 다음</p>
@@ -32,6 +33,7 @@
       <button class="btn" id="startBtn">출발!</button>
       <p class="wallet" id="wallet"></p>
       <p class="keys"><span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">K</span> <span class="kbd">L</span> 네 줄로 내려오는 노트 · 길게 누르면 쓰왜 · 키는 설정에서 바꿀 수 있어요</p>
+      <p class="credit">네 곡 모두 이 페이지가 직접 연주하는 창작 칩튠이에요 · 폰에서는 네 줄을 손가락으로 두드리면 됩니다</p>
     </section>
 
     <section class="screen" id="resultScreen" hidden>
@@ -79,7 +81,6 @@
       </div>
     </div>
   </div>
-  <footer><b>음악</b> 네 곡 모두 이 페이지가 Web Audio로 직접 연주하는 창작 칩튠 — 외부 음원 없음. 폰에서는 네 줄을 손가락으로 두드리면 됩니다.</footer>
 </div>
 <!-- 순서대로 읽혀야 합니다 -->
 <script defer src="js/data.js"></script>

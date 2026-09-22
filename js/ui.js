@@ -28,7 +28,9 @@ let char=CHARS[0], song=SONGS[0], diff=DIFFS[0];
 let notes=[], events=[], evIndex=0, WIN={...BASE_WIN}, APPROACH=2.0;
 let score=0, combo=0, maxCombo=0, tally={perfect:0,great:0,good:0,miss:0}, accSum=0;
 let charState='run', charTimer=0, jumpT=0, hitBounce=0;
-const laneHold=[false,false,false,false], laneFlash=[0,0,0,0], touchLane={};
+const laneHold=[false,false,false,false], laneFlash=[0,0,0,0], laneBeam=[0,0,0,0],
+      laneMiss=[0,0,0,0], touchLane={};
+let comboPop=0, shakeT=0, perfectStreak=0;
 let fx=[], texts=[], parts=[], stars=[], flyers=[], lastSection=-1;
 let best=loadBest();
 
@@ -535,9 +537,10 @@ function resumePlay(){
 }
 
 /* ===== 판정 ===== */
+const uiK=()=>Math.max(0.85, Math.min(1.7, Math.min(W/960, H/540)));
 /* 4키 낙하형 좌표 */
 
-function fieldW(){ return Math.min(W*(W<560?0.78:0.60), H*0.80, 430); }
+function fieldW(){ return Math.min(W*(W<560?0.80:0.58), H*0.86, 620); }
 function fieldX(){ return (W-fieldW())/2; }
 function laneW(){ return fieldW()/4; }
 function laneX(i){ return fieldX()+laneW()*(i+0.5); }
@@ -566,18 +569,18 @@ function hit(lane){
   combo++; maxCombo=Math.max(maxCombo,combo);
   tally[v]++; accSum+=VAL[v];
   score += 100*VAL[v]*(1+Math.min(combo/10*0.1,1.0))*diff.mult;
-  const lx=laneX(lane), ly=judgeY();
-  fx.push({x:lx,y:ly,r:10,life:1,kind:v});
-  for(let i=0;i<(v==='perfect'?8:4);i++)
-    fx.push({x:lx,y:ly,life:1,kind:'dust',vx:(Math.random()-.5)*160,vy:-40-Math.random()*130,r:3+Math.random()*3});
+  laneBeam[lane]=1; comboPop=1;
+  perfectStreak = v==='perfect' ? perfectStreak+1 : 0;
+  if(perfectStreak>0 && perfectStreak%10===0) shakeT=0.18;
+  spawnHitFx(lane, v);
   texts.length=0;
-  texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL[v],big:v==='perfect'});
+  texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL[v],big:v==='perfect',v:v});
   if(combo%10===0){ charState='jump'; jumpT=0; } else { charState='run'; hitBounce=1; }
   hitSound(lane, v);
 }
 function miss(n){
   n.judged=true; n.done=true; n.verdict='miss';
-  combo=0; tally.miss++;
+  combo=0; tally.miss++; perfectStreak=0; laneMiss[n.lane]=1;
   texts.length=0;
   texts.push({x:W*0.5,y:judgeY()-H*0.24,life:1,s:LABEL.miss});
   missSound();
@@ -667,6 +670,16 @@ $('resumeBtn').onclick=resumePlay;
 $('restartBtn').onclick=()=>{ if(ctx) ctx.resume(); startGame(); };
 $('pauseSetBtn').onclick=()=>openModal('settings');
 $('homeSetBtn').onclick=()=>openModal('settings');
+$('fsBtn').onclick=toggleFullscreen;
+function toggleFullscreen(){
+  const el=document.documentElement;
+  if(!document.fullscreenElement){ (el.requestFullscreen||el.webkitRequestFullscreen||(()=>{})).call(el); }
+  else{ (document.exitFullscreen||document.webkitExitFullscreen||(()=>{})).call(document); }
+}
+document.addEventListener('fullscreenchange',()=>{
+  document.body.classList.toggle('fs', !!document.fullscreenElement);
+  $('fsBtn').textContent = document.fullscreenElement ? '⤢' : '⛶';
+});
 $('quitBtn').onclick=()=>{ show(null); endGame(); };
 pauseBtn.onclick=pause;
 $('homeTitleBtn').onclick=toTitle;
