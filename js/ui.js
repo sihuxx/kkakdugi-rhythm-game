@@ -177,11 +177,7 @@ function dexCard(c2){
     '<span class="art"><img alt="" src="'+SRC[c2.run]+'"></span>'+
     '<span class="nm">'+(has?c2.name:'???')+'</span>'+
     '<span class="meta">'+(has?c2.meta:RARITY[c2.rank].name)+'</span>';
-  b.onclick=()=>{
-    if(!has){ b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
-              $('modalHint').textContent='아직 못 만난 두기예요 — 뽑기에서 만날 수 있어요'; return; }
-    char=c2; freshIds.delete(c2.id); refreshPicks(); closeModal();
-  };
+  b.onclick=()=>{ freshIds.delete(c2.id); openCharDetail(c2); };
   return b;
 }
 function buildDex(body){
@@ -222,7 +218,7 @@ function openModal(kind){
 
   if(kind==='char'){
     $('modalTitle').textContent='두기 도감';
-    $('modalHint').textContent='가지고 있는 두기를 눌러 고르세요';
+    $('modalHint').textContent='두기를 누르면 자세히 볼 수 있어요';
     buildDex(body);
   } else if(kind==='song'){
     $('modalTitle').textContent='노래 고르기';
@@ -355,62 +351,59 @@ function renderPullResult(got){
 let keyWait=-1;
 function buildSettings(body){
   const wrap=document.createElement('div'); wrap.className='setlist'; body.appendChild(wrap);
-  const row=(title,val,inner,hint)=>{
+  const group=(title)=>{
+    const d=document.createElement('div'); d.className='setgroup';
+    d.innerHTML='<h5>'+title+'</h5>'; wrap.appendChild(d); return d;
+  };
+  const row=(parent,title,val,inner,hint)=>{
     const d=document.createElement('div'); d.className='setrow';
     d.innerHTML='<div class="lbl"><b>'+title+'</b><span>'+val+'</span></div>'+inner+
                 (hint?'<div class="hint">'+hint+'</div>':'');
-    wrap.appendChild(d); return d;
+    parent.appendChild(d); return d;
+  };
+  const slider=(parent,title,val,attrs,onInput,hint)=>{
+    const d=row(parent,title,val,'<input type="range" '+attrs+'>',hint);
+    d.querySelector('input').oninput=e=>{
+      d.querySelector('.lbl span').textContent = onInput(+e.target.value);
+    };
+    return d;
   };
 
-  // 키 바꾸기
-  const kr=row('키 바꾸기','누르면 새 키를 받아요',
-    '<div class="keyrow">'+settings.keys.map((k,i)=>
-      '<button class="keybtn" data-i="'+i+'" type="button">'+keyLabel(k)+
-      '<small>'+(i+1)+'번째 줄</small></button>').join('')+'</div>',
-    '왼쪽부터 순서대로예요. 방향키·기호키도 됩니다.');
+  /* 조작 */
+  const g1=group('조작');
+  const kr=row(g1,'키 바꾸기','누르고 새 키를 눌러요',
+    '<div class="keyrow">'+settings.keys.map((k,i2)=>
+      '<button class="keybtn" data-i="'+i2+'" type="button">'+keyLabel(k)+
+      '<small>'+(i2+1)+'번째</small></button>').join('')+'</div>');
   kr.querySelectorAll('.keybtn').forEach(btn=>{
-    btn.onclick=()=>{
-      kr.querySelectorAll('.keybtn').forEach(b=>b.classList.remove('wait'));
-      btn.classList.add('wait'); btn.textContent='...'; keyWait=+btn.dataset.i;
-    };
+    btn.onclick=()=>{ kr.querySelectorAll('.keybtn').forEach(b=>b.classList.remove('wait'));
+                      btn.classList.add('wait'); btn.textContent='...'; keyWait=+btn.dataset.i; };
+  });
+  slider(g1,'노트 속도','x'+settings.speed.toFixed(1),
+    'min="0.6" max="2" step="0.1" value="'+settings.speed+'"',
+    v=>{ settings.speed=v; save(); return 'x'+v.toFixed(1); },
+    '올릴수록 노트가 짧게 보여서 타이밍이 또렷해져요.');
+  slider(g1,'싱크 보정', settings.offset+' ms',
+    'min="-150" max="150" step="5" value="'+settings.offset+'"',
+    v=>{ settings.offset=v; save(); return v+' ms'; },
+    '노트가 소리보다 빠르면 −쪽, 늦으면 +쪽. 기기 지연은 자동으로 한 번 더 보정합니다.');
+
+  /* 소리 */
+  const g2=group('소리');
+  [['volMusic','노래'],['volBgm','배경음'],['volSfx','효과음']].forEach(([k,label])=>{
+    slider(g2,label, Math.round(settings[k]*100)+'%',
+      'min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'"',
+      v=>{ settings[k]=v/100; applyVolumes(); save(); if(k==='volSfx') uiClick(); return v+'%'; });
   });
 
-  // 노트 속도
-  const sr=row('노트 속도','x'+settings.speed.toFixed(1),
-    '<input type="range" id="setSpeed" min="0.6" max="2" step="0.1" value="'+settings.speed+'">',
-    '높이면 노트가 빨리 내려와서 타이밍 보기가 쉬워져요.');
-  sr.querySelector('#setSpeed').oninput=e=>{
-    settings.speed=+e.target.value; sr.querySelector('.lbl span').textContent='x'+settings.speed.toFixed(1); save();
-  };
-
-  // 싱크
-  const or_=row('싱크 보정', settings.offset+' ms',
-    '<input type="range" id="setOffset" min="-150" max="150" step="5" value="'+settings.offset+'">',
-    '노트가 소리보다 빨리 오면 −쪽, 늦게 오면 +쪽으로 옮기세요.');
-  or_.querySelector('#setOffset').oninput=e=>{
-    settings.offset=+e.target.value; or_.querySelector('.lbl span').textContent=settings.offset+' ms'; save();
-  };
-
-  // 볼륨 3개
-  [['volMusic','노래 볼륨'],['volBgm','배경음 볼륨'],['volSfx','효과음 볼륨']].forEach(([k,label])=>{
-    const vr=row(label, Math.round(settings[k]*100)+'%',
-      '<input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'">');
-    vr.querySelector('input').oninput=e=>{
-      settings[k]=+e.target.value/100;
-      vr.querySelector('.lbl span').textContent=e.target.value+'%';
-      applyVolumes(); save();
-      if(k==='volSfx') uiClick();
-    };
-  });
-
-  // 노트 스킨
-  const sk=row('노트 색','도감을 모으면 늘어나요',
+  /* 꾸미기 */
+  const g3=group('꾸미기');
+  const sk=row(g3,'노트 색','도감을 모으면 늘어나요',
     '<div class="skinrow">'+Object.entries(SKINS).map(([id,s])=>{
       const has=skins.includes(id);
       return '<button class="skinbtn" data-s="'+id+'" type="button"'+(has?'':' disabled')+
-        ' aria-pressed="'+(settings.skin===id)+'">'+
-        '<span class="nm">'+s.name+'</span><span class="swatch">'+
-        s.col.map(c2=>'<i style="background:'+c2+'"></i>').join('')+'</span>'+
+        ' aria-pressed="'+(settings.skin===id)+'"><span class="nm">'+s.name+'</span>'+
+        '<span class="swatch">'+s.col.map(c2=>'<i style="background:'+c2+'"></i>').join('')+'</span>'+
         '<small>'+(has?'보유':'도감 '+s.need+'종')+'</small></button>';
     }).join('')+'</div>');
   sk.querySelectorAll('.skinbtn').forEach(btn=>{
@@ -418,13 +411,52 @@ function buildSettings(body){
     btn.onclick=()=>{ settings.skin=btn.dataset.s; applySkin(); save(); openModal('settings'); };
   });
 
-  // 되돌리기
   const rs=document.createElement('button');
   rs.className='btn ghost small'; rs.type='button'; rs.textContent='기본값으로';
   rs.onclick=()=>{ settings.keys=[...DEFAULT_KEYS]; settings.speed=1; settings.offset=0;
     settings.volMusic=settings.volBgm=settings.volSfx=1; settings.skin='basic';
     applySkin(); applyVolumes(); save(); openModal('settings'); };
   wrap.appendChild(rs);
+}
+
+/* ===== 캐릭터 상세 ===== */
+function openCharDetail(c2){
+  modalOpen='char';
+  const body=$('modalBody'); body.innerHTML='';
+  $('modalTitle').textContent='두기 정보';
+  $('modalHint').textContent='';
+  $('modalClose').hidden=true;
+  const has=own.has(c2.id), R=RARITY[c2.rank];
+  const d=document.createElement('div'); d.className='detail';
+  d.innerHTML=
+    '<div class="art" style="background:'+R.color+'44"><i></i>'+
+      '<img alt="" src="'+SRC[c2.run]+'"'+(has?'':' style="filter:brightness(0);opacity:.2"')+'></div>'+
+    '<div class="info">'+
+      '<span class="rk" style="background:'+R.color+'"><span class="stars">'+'★'.repeat(STARS[c2.rank])+
+        '</span> '+R.name+'</span>'+
+      '<h3>'+(has?c2.name:'??? 두기')+'</h3>'+
+      '<p class="desc">'+(has?c2.meta:'아직 만나지 못한 두기예요.')+'</p>'+
+      '<div class="facts">'+
+        '<span>뽑기 확률 <b>'+(c2.p? c2.p+'%':'기본 보유')+'</b></span>'+
+        '<span>달리는 모습 <b>'+(c2.style==='slide'?'미끄러짐':c2.style==='float'?'둥둥 뜸':'통통 뜀')+'</b></span>'+
+        '<span>보유 <b>'+(has?'가지고 있음':'없음')+'</b></span>'+
+      '</div>'+
+      '<div class="row"></div>'+
+    '</div>';
+  body.appendChild(d);
+  const row=d.querySelector('.row');
+  if(has){
+    const pick=document.createElement('button');
+    pick.className='btn'; pick.type='button';
+    pick.textContent = char===c2 ? '지금 이 두기예요' : '이 두기로 달리기';
+    pick.disabled = char===c2;
+    pick.onclick=()=>{ char=c2; freshIds.delete(c2.id); refreshPicks(); closeModal(); };
+    row.appendChild(pick);
+  }
+  const back=document.createElement('button');
+  back.className='btn ghost small'; back.type='button'; back.textContent='도감으로';
+  back.onclick=()=>openModal('char');
+  row.appendChild(back);
 }
 
 /* ===== 뽑기 화면 ===== */
@@ -537,6 +569,7 @@ function resumePlay(){
 }
 
 /* ===== 판정 ===== */
+function audioLat(){ return ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0; }
 const uiK=()=>Math.max(0.85, Math.min(1.7, Math.min(W/960, H/540)));
 /* 4키 낙하형 좌표 */
 
@@ -658,7 +691,9 @@ document.addEventListener('pointerdown',e=>{
 },true);
 addEventListener('keydown',audioKick,true);
 function audioKick(){
-  initAudio(); if(ctx.state==='suspended') ctx.resume();
+  initAudio();
+  // 일시정지·카운트다운 중에는 절대 되살리지 않는다 (예전엔 여기서 곡이 먼저 흘러갔음)
+  if(mode!=='pause' && !cdTimer && ctx.state==='suspended') ctx.resume();
   if(mode==='title'||mode==='hub'||mode==='result') bgmStart();
 }
 $('modalClose').onclick=closeModal;
