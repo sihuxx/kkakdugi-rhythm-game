@@ -1,5 +1,5 @@
 "use strict";
-/* 소리 — Web Audio로 반주와 효과음을 직접 연주 — 꺅두기 러닝비트 */
+/* 소리 — 꺅두기 하우스 */
 
 /* ===== 소리 ===== */
 let ctx=null, master=null, musicGain=null, sfxGain=null, noiseBuf=null;
@@ -221,4 +221,50 @@ function preview(song){
     song.kick.forEach(s=>kick(t0+base+s*song.step));
   });
   previewUntil=t0+dur;
+}
+
+/* ===== 집에서 나는 소리 ===== */
+function sfxCare(kind){
+  if(!ctx) return;
+  const t=ctx.currentTime;
+  const seq={
+    feed:[[523,0],[659,0.08],[784,0.16]],
+    water:[[880,0],[1180,0.07]],
+    sleep:[[392,0],[330,0.16],[262,0.32]],
+    play:[[659,0],[880,0.07],[1046,0.14],[1318,0.21]],
+    wash:[[1046,0],[1318,0.06],[1046,0.12]],
+    clean:[[440,0],[523,0.06],[440,0.12],[523,0.18]]
+  }[kind]||[[660,0]];
+  seq.forEach(([f,d])=>blip(f,0.06));
+  seq.forEach(([f,d],i)=>{ const o=ctx.createOscillator(),gn=ctx.createGain();
+    o.type=kind==='sleep'?'sine':'triangle'; o.frequency.value=f;
+    gn.gain.setValueAtTime(0.0001,t+d); gn.gain.exponentialRampToValueAtTime(0.09,t+d+0.01);
+    gn.gain.exponentialRampToValueAtTime(0.0001,t+d+0.22);
+    o.connect(gn); gn.connect(sfxGain); o.start(t+d); o.stop(t+d+0.26); });
+}
+function sfxGrow(){
+  if(!ctx) return; const t=ctx.currentTime;
+  [523,659,784,1046,1318].forEach((f,i)=>{
+    const o=ctx.createOscillator(),gn=ctx.createGain();
+    o.type='triangle'; o.frequency.value=f;
+    gn.gain.setValueAtTime(0.0001,t+i*0.09); gn.gain.exponentialRampToValueAtTime(0.13,t+i*0.09+0.02);
+    gn.gain.exponentialRampToValueAtTime(0.0001,t+i*0.09+0.5);
+    o.connect(gn); gn.connect(sfxGain); o.start(t+i*0.09); o.stop(t+i*0.09+0.55); });
+}
+function sfxNo(){
+  if(!ctx) return; const t=ctx.currentTime;
+  const o=ctx.createOscillator(),gn=ctx.createGain();
+  o.type='square'; o.frequency.setValueAtTime(320,t); o.frequency.exponentialRampToValueAtTime(180,t+0.18);
+  gn.gain.setValueAtTime(0.07,t); gn.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+  o.connect(gn); gn.connect(sfxGain); o.start(t); o.stop(t+0.22);
+}
+function sfxCoin(n){
+  if(!ctx) return; const t=ctx.currentTime;
+  for(let i=0;i<Math.min(6,n);i++){
+    const o=ctx.createOscillator(),gn=ctx.createGain();
+    o.type='sine'; o.frequency.value=880*Math.pow(1.12,i);
+    gn.gain.setValueAtTime(0.0001,t+i*0.06); gn.gain.exponentialRampToValueAtTime(0.1,t+i*0.06+0.01);
+    gn.gain.exponentialRampToValueAtTime(0.0001,t+i*0.06+0.25);
+    o.connect(gn); gn.connect(sfxGain); o.start(t+i*0.06); o.stop(t+i*0.06+0.3);
+  }
 }

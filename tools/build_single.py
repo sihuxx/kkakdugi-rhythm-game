@@ -8,21 +8,21 @@
 import base64, pathlib, re, mimetypes
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-OUT  = ROOT / "dist" / "ggakdugi-rhythm.html"
+OUT  = ROOT / "dist" / "ggakdugi-house.html"
+ORDER = ["boot","data","grow","save","chart","audio","world","menus","cut","home","rhythm","run","app"]
 
-def data_uri(path: pathlib.Path) -> str:
+def data_uri(path):
     mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 html = (ROOT / "index.html").read_text(encoding="utf-8")
 css  = (ROOT / "css" / "style.css").read_text(encoding="utf-8")
+js   = "\n".join((ROOT / "js" / f"{n}.js").read_text(encoding="utf-8") for n in ORDER)
 
-order = ["data", "chart", "audio", "ui", "world", "render"]
-js = "\n".join((ROOT / "js" / f"{n}.js").read_text(encoding="utf-8") for n in order)
-
-# assets/x.png → data:image/png;base64,...
 for png in sorted((ROOT / "assets").glob("*.png")):
-    js = js.replace(f"assets/{png.name}", data_uri(png))
+    uri = data_uri(png)
+    js = js.replace(f"assets/{png.name}", uri)
+    html = html.replace(f"assets/{png.name}", uri)
 
 html = html.replace('<link rel="stylesheet" href="css/style.css">', f"<style>\n{css}\n</style>")
 html = re.sub(r'\s*<!-- 순서대로 읽혀야 합니다 -->', "", html)

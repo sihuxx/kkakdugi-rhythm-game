@@ -1,5 +1,5 @@
 "use strict";
-/* 배경 테마·소품·입자 — 꺅두기 러닝비트 */
+/* 리듬게임 배경 — 꺅두기 하우스 */
 
 /* ===== 배경 테마 ===== */
 function rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
@@ -37,7 +37,7 @@ function propKind(section){ const p=THEMES[song.theme].props; return p[section%p
 
 function drawProp(kind,x,gy,s,th){
   g.save(); g.translate(x,gy); g.scale(s,s);
-  g.lineWidth=2.6; g.strokeStyle=th.ink; g.lineJoin='round';
+  g.lineWidth=LW(); g.strokeStyle=th.ink; g.lineJoin='round';
   if(kind==='flower'){
     g.strokeStyle=th.grass; g.beginPath(); g.moveTo(0,0); g.quadraticCurveTo(2,-12,0,-22); g.stroke();
     g.fillStyle='#FFB3C1'; g.strokeStyle=th.ink;
@@ -53,7 +53,7 @@ function drawProp(kind,x,gy,s,th){
   } else if(kind==='puddle'){
     g.fillStyle='#A9D9F0'; g.globalAlpha=.75;
     g.beginPath(); g.ellipse(0,-2,22,6,0,0,6.3); g.fill(); g.globalAlpha=1; g.stroke();
-    g.strokeStyle='#FFFDF6'; g.lineWidth=1.6;
+    g.strokeStyle='#FFFDF6'; g.lineWidth=LW()*0.55;
     g.beginPath(); g.ellipse(-4,-3,9,2.4,0,0,6.3); g.stroke();
   } else if(kind==='cactus'){
     g.fillStyle='#8FAE6E'; g.beginPath();
@@ -61,7 +61,7 @@ function drawProp(kind,x,gy,s,th){
     g.beginPath(); g.moveTo(-5,-16); g.lineTo(-13,-16); g.lineTo(-13,-24); g.stroke();
     g.beginPath(); g.moveTo(5,-21); g.lineTo(12,-21); g.lineTo(12,-28); g.stroke();
   } else {                                  // tuft
-    g.strokeStyle=th.grass; g.lineWidth=2.6;
+    g.strokeStyle=th.grass; g.lineWidth=LW();
     g.beginPath(); g.moveTo(0,0); g.quadraticCurveTo(4,-11,11,-15); g.stroke();
     g.beginPath(); g.moveTo(0,0); g.quadraticCurveTo(-4,-10,-10,-14); g.stroke();
     g.beginPath(); g.moveTo(0,0); g.lineTo(0,-16); g.stroke();
@@ -92,7 +92,7 @@ function drawParticles(dt){
   parts=parts.filter(p=>p.life>0 && p.y<H+20 && p.x>-30);
   for(const p of parts){
     g.globalAlpha=Math.max(0,Math.min(1,p.life))*(p.k==='sparkle'?0.5+0.5*Math.sin(performance.now()/300+p.x):1);
-    if(p.k==='rain'){ g.strokeStyle=p.c; g.lineWidth=1.6; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x-4,p.y+12); g.stroke(); }
+    if(p.k==='rain'){ g.strokeStyle=p.c; g.lineWidth=LW()*0.55; g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(p.x-4,p.y+12); g.stroke(); }
     else { g.fillStyle=p.c; g.beginPath(); g.ellipse(p.x,p.y,p.r*(p.k==='petal'?1.5:1),p.r,p.k==='petal'?0.6:0,0,6.3); g.fill(); }
   }
   g.globalAlpha=1;
@@ -106,7 +106,7 @@ function spawnFlyer(){
 function drawFlyers(dt,th){
   for(const f of flyers){
     f.x+=f.vx*dt; if(f.vy) f.y+=f.vy*dt; f.ph=(f.ph||0)+dt*8; if(f.k==='tumble') f.rot+=dt*7;
-    g.strokeStyle=th.ink; g.lineWidth=2.4; g.lineCap='round';
+    g.strokeStyle=th.ink; g.lineWidth=LW()*0.7; g.lineCap='round';
     if(f.k==='bird'){
       for(let i=0;i<3;i++){
         const bx=f.x+i*26, by=f.y+Math.sin(f.ph+i)*5+(i%2)*12, w=7+Math.sin(f.ph+i)*3;
@@ -114,7 +114,7 @@ function drawFlyers(dt,th){
         g.quadraticCurveTo(bx+4,by-w,bx+9,by); g.stroke();
       }
     } else if(f.k==='shoot'){
-      f.life-=dt*0.7; g.globalAlpha=Math.max(0,f.life); g.strokeStyle='#FFF3C4'; g.lineWidth=3;
+      f.life-=dt*0.7; g.globalAlpha=Math.max(0,f.life); g.strokeStyle='#FFF3C4'; g.lineWidth=LW();
       g.beginPath(); g.moveTo(f.x,f.y); g.lineTo(f.x+46,f.y-20); g.stroke(); g.globalAlpha=1;
     } else {
       g.save(); g.translate(f.x,f.y); g.rotate(f.rot); g.strokeStyle='#B99A6B';
@@ -167,7 +167,7 @@ function scene(t,th,prog){
   }
   // 땅
   g.fillStyle=th.ground; g.fillRect(0,gy,W,H-gy);
-  g.strokeStyle=th.ink; g.lineWidth=3; g.beginPath();
+  g.strokeStyle=th.ink; g.lineWidth=LW(); g.beginPath();
   for(let x=0;x<=W;x+=14) g.lineTo(x,gy+Math.sin((x+t*230)*0.03)*1.6);
   g.stroke();
   // 소품 (구간마다 종류가 바뀐다)

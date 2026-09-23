@@ -1,11 +1,11 @@
 "use strict";
-/* 캐릭터·곡·난이도·표지 데이터 — 꺅두기 러닝비트 */
+/* 모습·곡·난이도 데이터 — 꺅두기 하우스 */
 
 /* ===== 에셋 ===== */
 const SRC = {
   wool:"assets/run.png", wing:"assets/jump.png", poot:"assets/fall.png", clover:"assets/clover.png",
   clown:"assets/clown.png", cowboy:"assets/cowboy.png", fairy:"assets/fairy.png",
-  rabbit:"assets/rabbit.png", dog:"assets/dog.png", cat:"assets/cat.png", bear:"assets/bear.png",
+  rabbit:"assets/rabbit.png", cat:"assets/cat.png", bear:"assets/bear.png",
   huggy:"assets/huggy.png", killer:"assets/killer.png", baby:"assets/baby.png", proud:"assets/proud.png",
   icecream:"assets/icecream.png", holdbaby:"assets/holdbaby.png", belly:"assets/belly.png",
   car:"assets/car.png", school:"assets/school.png", snail:"assets/snail.png"
@@ -19,13 +19,13 @@ for(const k in SRC){ const im=new Image(); im.src=SRC[k]; IMG[k]=im; }
 const RARITY = {
   base:{ name:'기본',      color:'#F2E8D9', note:'처음부터 있음' },
   N:   { name:'흔함',      color:'#DCEBD6', note:'각 7.9%' },
-  R:   { name:'귀함',      color:'#A9D9F0', note:'각 4.6%' },
+  R:   { name:'귀함',      color:'#A9D9F0', note:'각 5.3%' },
   SR:  { name:'아주 귀함', color:'#FFB3C1', note:'각 3.7%' },
   SSR: { name:'전설',      color:'#B9A7D9', note:'2%' }
 };
 function C(o){ return Object.assign({ flip:true, scale:1, float:0, style:'run', accent:'#7BC47F' }, o); }
 const CHARS = [
-  C({ id:'wool', name:'양털 두기', meta:'포근한 기본', rank:'base', p:0,
+  C({ id:'wool', name:'양 두기', meta:'포근한 기본', rank:'base', p:0,
       run:'wool', jump:'wing', fall:'poot' }),
 
   C({ id:'proud',    name:'의젓 두기',   meta:'뒷짐 지고 당당하게', rank:'N', p:7.9,
@@ -43,19 +43,17 @@ const CHARS = [
   C({ id:'snail',    name:'달팽이 두기', meta:'느긋하게 미끄러짐', rank:'N', p:7.9,
       run:'snail', jump:'snail', fall:'snail', scale:0.88, style:'slide', jumpRot:-0.08, fallRot:0.3, accent:'#7BC47F' }),
 
-  C({ id:'rabbit',  name:'토끼탈 두기',  meta:'분홍 토끼탈', rank:'R', p:4.6,
+  C({ id:'rabbit',  name:'토끼탈 두기',  meta:'분홍 토끼탈', rank:'R', p:5.3,
       run:'rabbit', jump:'rabbit', fall:'rabbit', jumpRot:-0.2, fallRot:0.5, accent:'#FFB3C1' }),
-  C({ id:'dog',     name:'강아지탈 두기', meta:'복슬복슬 꼬리', rank:'R', p:4.6,
-      run:'dog', jump:'dog', fall:'dog', jumpRot:-0.2, fallRot:0.5, accent:'#EDE6D8' }),
-  C({ id:'cat',     name:'고양이탈 두기', meta:'노란 고양이탈', rank:'R', p:4.6,
+  C({ id:'cat',     name:'고양이탈 두기', meta:'노란 고양이탈', rank:'R', p:5.3,
       run:'cat', jump:'cat', fall:'cat', jumpRot:-0.2, fallRot:0.5, accent:'#F5C36B' }),
-  C({ id:'bear',    name:'곰탈 두기',    meta:'갈색 곰탈', rank:'R', p:4.6,
+  C({ id:'bear',    name:'곰 두기',      meta:'갈색 곰 옷', rank:'R', p:5.3,
       run:'bear', jump:'bear', fall:'bear', jumpRot:-0.2, fallRot:0.5, accent:'#A9805A' }),
-  C({ id:'icecream',name:'초코 두기',    meta:'아이스크림 한 손에', rank:'R', p:4.6,
+  C({ id:'icecream',name:'초코 두기',    meta:'아이스크림 한 손에', rank:'R', p:5.3,
       run:'icecream', jump:'icecream', fall:'icecream', scale:0.95, jumpRot:-0.15, fallRot:0.45, accent:'#8B5E3C' }),
-  C({ id:'clown',   name:'광대 두기',    meta:'무지개 가발', rank:'R', p:4.6,
+  C({ id:'clown',   name:'광대 두기',    meta:'무지개 가발', rank:'R', p:5.3,
       run:'clown', jump:'clown', fall:'clown', jumpRot:-0.22, fallRot:0.5, accent:'#FFB3C1' }),
-  C({ id:'cowboy',  name:'카우보이 두기', meta:'카피바라 탑승', rank:'R', p:4.6,
+  C({ id:'cowboy',  name:'카우보이 두기', meta:'카피바라 탑승', rank:'R', p:5.3,
       run:'cowboy', jump:'cowboy', fall:'cowboy', flip:false, scale:1.18, style:'slide',
       jumpRot:-0.1, fallRot:-0.4, accent:'#D9C4A0' }),
 

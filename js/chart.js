@@ -1,5 +1,5 @@
 "use strict";
-/* 채보 생성 — 멜로디에서 노트를 뽑아낸다 — 꺅두기 러닝비트 */
+/* 채보 생성 — 꺅두기 하우스 */
 
 /* ===== 채보 만들기 ===== */
 function buildChart(song, diffId){
@@ -41,17 +41,38 @@ function buildChart(song, diffId){
 
   // 음 높이로 레인(A·S·K·L) 배정 — 낮은 음이 왼쪽
   const ms=picked.map(o=>o.m), lo=Math.min(...ms), hi=Math.max(...ms), span=Math.max(1,hi-lo);
-  const notes=[]; let prevM=null, lastLane=-1, rep=0;
+  const notes=[];
+  let lastLane=-1, rep=0;
+  const busy=[0,0,0,0];            // 그 줄의 롱노트가 끝나는 시각
+  const lastAt=[-9,-9,-9,-9];      // 그 줄에서 마지막으로 친 시각
+  const MINGAP=Math.max(0.085, STEP*0.9);
+
   picked.forEach(o=>{
     let type = o.len>=3 ? 'hold' : 'tap';
     if(diffId==='easy' && type==='hold' && o.len<4) type='tap';
+    const t = o.bi*song.barDur + o.st*STEP;
+    const dur = type==='hold' ? o.len*STEP*0.9 : 0;
 
-    let lane=Math.min(3, Math.floor((o.m-lo)/span*4));
-    if(lane===lastLane){ rep++; if(rep>=3){ lane=(lane+1)%4; rep=0; } } else rep=0;
-    lastLane=lane; prevM=o.m;
+    let want=Math.min(3, Math.floor((o.m-lo)/span*4));
+    if(want===lastLane){ rep++; if(rep>=3){ want=(want+1)%4; rep=0; } } else rep=0;
 
-    notes.push({ t:o.bi*song.barDur + o.st*STEP, lane, type,
-                 dur: type==='hold' ? o.len*STEP*0.9 : 0,
+    // 잡고 있는 줄이나 방금 친 줄은 피한다 (롱노트 한가운데 일반 노트가 겹치던 문제)
+    const free = l => t >= busy[l]-0.02 && t-lastAt[l] >= MINGAP-1e-6;
+    let lane = -1;
+    if(free(want)) lane = want;
+    else {
+      for(let d=1; d<4 && lane<0; d++){
+        for(const cand of [want-d, want+d]){
+          if(cand>=0 && cand<4 && free(cand)){ lane=cand; break; }
+        }
+      }
+    }
+    if(lane<0) return;             // 네 줄이 다 막혔으면 이 노트는 버린다
+
+    lastLane=lane; lastAt[lane]=t;
+    if(type==='hold') busy[lane]=t+dur+0.06;
+
+    notes.push({ t, lane, type, dur,
                  judged:false, holding:false, done:false, verdict:null, seed:Math.random()*6.28 });
   });
   return notes;

@@ -1,0 +1,32 @@
+"use strict";
+/* 공용 도구 — 꺅두기 하우스 */
+
+/* ===============================================================
+   공용 도구 — 캔버스 · 크기 · 선 굵기
+   =============================================================== */
+const $ = id => document.getElementById(id);
+const cv = $('cv');
+let g = cv.getContext('2d');
+let W = 960, H = 540, dpr = 1;
+const modal = $('modal');
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resize(){
+  const r = cv.getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = Math.max(320, r.width); H = Math.max(240, r.height);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', () => { resize(); if(typeof DugiRun !== 'undefined') DugiRun.resize(); });
+
+const uiK = () => Math.max(0.85, Math.min(1.7, Math.min(W / 960, H / 540)));
+/* 게임 안의 모든 선은 이 굵기 하나로 통일 */
+const LW = () => Math.max(2.4, 3.1 * uiK());
+
+function roundRect(x, y, w, h, r){
+  r = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+  g.beginPath(); g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}

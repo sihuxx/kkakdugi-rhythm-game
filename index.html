@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>꺅두기 러닝비트</title>
-<meta name="description" content="꺅두기가 달리며 박자를 밟는 웹 리듬게임. 두기 18종 도감과 클로버 뽑기.">
+<title>꺅두기 하우스</title>
+<meta name="description" content="꺅두기를 애기부터 어른까지 키우는 웹 게임. 집을 꾸미고, 리듬게임과 꺅두기런으로 클로버를 벌어요.">
 <link rel="icon" href="assets/clover.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,32 +12,55 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
 <div id="app">
   <div id="stage">
     <canvas id="cv"></canvas>
-    <button id="fsBtn" type="button" title="전체화면">⛶</button>
-    <button id="pauseBtn" hidden>일시정지</button>
-    <button id="skipBtn" hidden>건너뛰기 ▶▶</button>
-    <p id="tapHint" hidden>탭하면 다음</p>
-    <div id="homeBar" hidden>
-      <span id="homeClover"></span>
-      <span class="hc">두기 · <b id="homeChar"></b></span>
-      <button id="homeSongBtn" type="button">노래 고르기</button>
-      <button id="homeSetBtn" type="button">설정</button>
-      <button id="homeTitleBtn" type="button">타이틀</button>
-    </div>
 
-    <section class="screen" id="titleScreen">
-      <img class="mascot sway" id="titleArt" alt="꺅두기">
-      <h1>꺅두기 러닝비트<span class="sub">GGAKDUGI RUNNING BEAT</span></h1>
-      <button class="btn" id="startBtn">출발!</button>
-      <p class="wallet" id="wallet"></p>
-      <p class="keys"><span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">K</span> <span class="kbd">L</span> 네 줄로 내려오는 노트 · 길게 누르면 쓰왜 · 키는 설정에서 바꿀 수 있어요</p>
-      <p class="credit">네 곡 모두 이 페이지가 직접 연주하는 창작 칩튠이에요 · 폰에서는 네 줄을 손가락으로 두드리면 됩니다</p>
+    <!-- 위쪽 상태바 -->
+    <header id="topbar">
+      <div class="who">
+        <span class="nm"><b id="barName">두기</b><i id="barStage">애기 두기</i></span>
+        <div class="exp"><div class="track"><div class="fill" id="expFill"></div></div>
+          <small id="expCap"></small></div>
+      </div>
+      <div class="stats" id="statRow">
+        <div class="stat"><span class="ic i-full"></span><div class="track"><div class="fill" id="st_full"></div></div></div>
+        <div class="stat"><span class="ic i-clean"></span><div class="track"><div class="fill" id="st_clean"></div></div></div>
+        <div class="stat"><span class="ic i-fun"></span><div class="track"><div class="fill" id="st_fun"></div></div></div>
+        <div class="stat"><span class="ic i-energy"></span><div class="track"><div class="fill" id="st_energy"></div></div></div>
+      </div>
+      <div class="right">
+        <span class="wallet" id="barClover"></span>
+        <span class="lookname">모습 · <b id="barLook">양 두기</b></span>
+        <nav class="tools">
+          <button id="outBtn"  type="button" title="외출">외출</button>
+          <button id="shopBtn" type="button" title="가구 상점">상점</button>
+          <button id="dexBtn"  type="button" title="옷장·도감">옷장</button>
+          <button id="setBtn"  type="button" title="설정">설정</button>
+          <button id="fsBtn"   type="button" title="전체화면">⛶</button>
+        </nav>
+      </div>
+    </header>
+
+    <button id="pauseBtn" type="button" hidden>일시정지</button>
+    <button id="skipBtn" type="button" hidden>건너뛰기</button>
+    <p id="tapHint" hidden>아무 곳이나 누르면 다음으로</p>
+
+    <!-- 처음 시작: 이름 짓기 -->
+    <section class="screen" id="introScreen" hidden>
+      <img class="mascot sway" src="assets/run.png" alt="꺅두기">
+      <h1>꺅두기 하우스<span class="sub">GGAKDUGI HOUSE</span></h1>
+      <p class="lead">오늘부터 두기를 키웁니다.<br>이름을 지어주세요.</p>
+      <input id="introName" class="nameinput big" type="text" maxlength="6" value="두기" aria-label="두기 이름">
+      <button class="btn" id="introGo">시작!</button>
+      <p class="credit">집에서는 <span class="kbd">WASD</span> 로 걷고 <span class="kbd">E</span> 로 돌봐요 ·
+        현관으로 나가면 미니게임으로 클로버를 벌 수 있어요</p>
     </section>
 
+    <!-- 리듬게임 결과 -->
     <section class="screen" id="resultScreen" hidden>
-      <img class="mascot" id="resultArt" alt="네잎클로버를 든 꺅두기">
+      <img class="mascot" id="resultArt" alt="">
       <div class="panel">
         <p class="grade" id="gradeText">세잎</p>
         <p class="score" id="scoreText">0</p>
@@ -52,42 +75,79 @@
         <p class="best" id="bestText"></p>
         <p class="reward" id="rewardText"></p>
       </div>
-      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        <button class="btn" id="retryBtn">한 번 더</button>
-        <button class="btn ghost" id="selectBtn">다른 곡</button>
-        <button class="btn ghost small" id="resultGachaBtn">뽑기</button>
+      <div class="row">
+        <button class="btn" id="againBtn">한 번 더</button>
+        <button class="btn ghost" id="homeBtn">집으로</button>
       </div>
     </section>
 
+    <!-- 꺅두기런 결과 -->
+    <section class="screen" id="runResult" hidden>
+      <img class="mascot" id="runArt" alt="">
+      <h1 id="runTitle" style="font-size:clamp(26px,5vw,44px)">도착!</h1>
+      <div class="panel">
+        <p class="score" id="runScore">0</p>
+        <div class="tally">
+          <div><b>달린 거리</b><span id="rDist">0 m</span></div>
+          <div><b>젤리</b><span id="rJelly">0</span></div>
+          <div><b>최고 연속</b><span id="rCombo">0</span></div>
+          <div><b>등급</b><span id="rGrade">-</span></div>
+        </div>
+        <p class="best" id="runBest"></p>
+        <p class="reward" id="runReward"></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="runAgain">한 번 더</button>
+        <button class="btn ghost" id="runHome">집으로</button>
+      </div>
+    </section>
+
+    <!-- 일시정지 -->
     <section class="screen" id="pauseScreen" hidden>
       <h1 style="font-size:clamp(24px,4.6vw,38px)">잠깐 쉬는 중</h1>
-      <p class="keys" id="pauseInfo"></p>
-      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <p class="tagline" id="pauseInfo"></p>
+      <div class="row">
         <button class="btn" id="resumeBtn">이어서</button>
-        <button class="btn ghost small" id="restartBtn">처음부터</button>
-        <button class="btn ghost small" id="pauseSetBtn">설정</button>
-        <button class="btn ghost small" id="quitBtn">그만</button>
+        <button class="btn ghost small" id="quitBtn">집으로</button>
       </div>
     </section>
 
-    <div id="countdown" hidden><span id="cdNum">3</span></div>
-    <div id="toast" hidden></div>
+    <!-- 공용 모달 -->
     <div class="modal" id="modal" hidden>
-      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <h2 id="modalTitle">누구로 달릴까</h2>
-        <div class="row" id="modalBody"></div>
-        <p class="keys" id="modalHint"></p>
+      <div class="sheet">
+        <h2 id="modalTitle">제목</h2>
+        <p class="hint" id="modalHint"></p>
+        <div id="modalBody"></div>
         <button class="btn ghost small" id="modalClose">확인</button>
       </div>
     </div>
+
+    <!-- 카운트다운 · 알림 -->
+    <div id="countdown" hidden><b id="cdNum">3</b></div>
+    <div id="toast" hidden></div>
+
+    <!-- 꺅두기런 폰 조작 -->
+    <div id="runPad" hidden>
+      <button id="rJump" type="button">점프</button>
+      <button id="rSkill" type="button">스킬</button>
+      <button id="rSlide" type="button">슬라이드</button>
+    </div>
   </div>
 </div>
+
 <!-- 순서대로 읽혀야 합니다 -->
+<script defer src="js/boot.js"></script>
 <script defer src="js/data.js"></script>
+<script defer src="js/grow.js"></script>
+<script defer src="js/save.js"></script>
 <script defer src="js/chart.js"></script>
 <script defer src="js/audio.js"></script>
-<script defer src="js/ui.js"></script>
 <script defer src="js/world.js"></script>
-<script defer src="js/render.js"></script>
+<script defer src="js/menus.js"></script>
+<script defer src="js/cut.js"></script>
+<script defer src="js/home.js"></script>
+<script defer src="js/rhythm.js"></script>
+<script defer src="js/run.js"></script>
+<script defer src="js/app.js"></script>
 </body>
 </html>
