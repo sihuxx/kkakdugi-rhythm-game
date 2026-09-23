@@ -24,6 +24,7 @@
         <div class="exp"><div class="track"><div class="fill" id="expFill"></div></div>
           <small id="expCap"></small></div>
       </div>
+      <div class="love" id="loveBox" title="애정도"><span id="loveHearts"></span></div>
       <div class="stats" id="statRow">
         <div class="stat"><span class="ic i-full"></span><div class="track"><div class="fill" id="st_full"></div></div></div>
         <div class="stat"><span class="ic i-clean"></span><div class="track"><div class="fill" id="st_clean"></div></div></div>
@@ -32,9 +33,9 @@
       </div>
       <div class="right">
         <span class="wallet" id="barClover"></span>
-        <span class="lookname">모습 · <b id="barLook">양 두기</b></span>
+        <span class="lookname">모습 · <b id="barLook">양 두기</b><br>집 · <b id="barHouse">낡은 방</b></span>
         <nav class="tools">
-          <button id="outBtn"  type="button" title="외출">외출</button>
+          <button id="outBtn"  type="button" title="알바하러 가기">알바</button>
           <button id="shopBtn" type="button" title="가구 상점">상점</button>
           <button id="dexBtn"  type="button" title="옷장·도감">옷장</button>
           <button id="setBtn"  type="button" title="설정">설정</button>
@@ -55,7 +56,7 @@
       <input id="introName" class="nameinput big" type="text" maxlength="6" value="두기" aria-label="두기 이름">
       <button class="btn" id="introGo">시작!</button>
       <p class="credit">집에서는 <span class="kbd">WASD</span> 로 걷고 <span class="kbd">E</span> 로 돌봐요 ·
-        현관으로 나가면 미니게임으로 클로버를 벌 수 있어요</p>
+        현관으로 나가면 알바를 해서 클로버를 벌 수 있어요</p>
     </section>
 
     <!-- 리듬게임 결과 -->
@@ -89,7 +90,7 @@
         <p class="score" id="runScore">0</p>
         <div class="tally">
           <div><b>달린 거리</b><span id="rDist">0 m</span></div>
-          <div><b>젤리</b><span id="rJelly">0</span></div>
+          <div><b>주운 동전</b><span id="rJelly">0</span></div>
           <div><b>최고 연속</b><span id="rCombo">0</span></div>
           <div><b>등급</b><span id="rGrade">-</span></div>
         </div>
@@ -125,6 +126,9 @@
     <!-- 카운트다운 · 알림 -->
     <div id="countdown" hidden><b id="cdNum">3</b></div>
     <div id="toast" hidden></div>
+
+    <!-- 아래 돌봄 버튼 -->
+    <div id="careBar"></div>
 
     <!-- 꺅두기런 폰 조작 -->
     <div id="runPad" hidden>

@@ -21,9 +21,11 @@ function freshSave(){
     look: 'wool',
     own: [...START_LOOKS],
     pity: 0,
-    dugi: { name:'두기', exp:0, full:70, clean:70, fun:70, energy:70 },
+    house: 0,
+    dugi: { name:'두기', exp:0, full:70, clean:70, fun:70, energy:70, love:0 },
     furn: [...BASE_FURN],
-    dust: 1,
+    req: null,
+    jobs: 0,
     claimed: [],
     skins: ['basic'],
     named: false,
@@ -71,7 +73,9 @@ function condition(){
   const d = S.dugi;
   return (d.full + d.clean + d.fun + d.energy) / 400;
 }
-function payMult(){ return (0.65 + 0.45 * condition()) * (1 + boost('pay')); }
+/* 알바비 배율 — 컨디션 + 애정도 + 가구 */
+function payMult(){ return (0.62 + 0.36 * condition() + 0.18 * (S.dugi.love / 100)) * (1 + boost('pay')); }
+function addLove(n){ S.dugi.love = Math.max(0, Math.min(100, (S.dugi.love || 0) + n)); }
 
 function addStat(k, v){
   const d = S.dugi;
@@ -93,11 +97,51 @@ function addExp(n){
 }
 let grewUp = 0;
 
-/* 외출하고 오면 배고프고 지저분해진다 */
+/* 알바하고 오면 배고프고 지저분해진다 */
 function afterOuting(){
-  addStat('full', -18); addStat('energy', -22); addStat('clean', -14); addStat('fun', 8);
-  if(Math.random() < 0.8) S.dust = Math.min(3, (S.dust || 0) + 1);
+  addStat('full', -18); addStat('energy', -22); addStat('clean', -16); addStat('fun', 8);
+  S.jobs = (S.jobs || 0) + 1;
+  newRequest(true);
   save();
+}
+
+/* ===== 두기가 먼저 조르기 ===== */
+const REQ_LINE = { feed:'배고파요…', wash:'꿉꿉해요', play:'심심해!', sleep:'졸려요…',
+                   water:'화분이 목말라 보여요', clean:'방이 지저분해요' };
+function newRequest(force){
+  if(S.req && !force) return;
+  const d = S.dugi;
+  const want = [];
+  if(d.full < 55) want.push('feed');
+  if(d.clean < 55) want.push('wash', 'clean');
+  if(d.energy < 55) want.push('sleep');
+  if(d.fun < 60) want.push('play', 'water');
+  const pick = want.length ? want[Math.floor(Math.random() * want.length)]
+                           : CARE_ORDER[Math.floor(Math.random() * CARE_ORDER.length)];
+  if(!want.length && Math.random() < 0.5){ S.req = null; return; }
+  S.req = { kind: pick, done: false };
+  save();
+}
+function clearRequest(kind){
+  if(S.req && S.req.kind === kind && !S.req.done){
+    S.req = null;
+    addClover(35); addLove(4);
+    toast('원하던 걸 해줬어요!', '보너스 클로버 35 · 애정도 +4');
+    sfxCoin(3);
+    return true;
+  }
+  return false;
+}
+
+/* ===== 집 업그레이드 ===== */
+function upgradeHouse(){
+  const nxt = HOUSES[(S.house || 0) + 1];
+  if(!nxt) return false;
+  if(S.clover < nxt.price){ sfxNo(); toast('클로버가 모자라요', nxt.name + '까지 ' +
+      (nxt.price - S.clover).toLocaleString('ko-KR') + ' 더'); return false; }
+  addClover(-nxt.price); S.house = (S.house || 0) + 1; save();
+  toast(nxt.name + '으로 이사!', nxt.note); sfxGrow();
+  return true;
 }
 
 /* ===== 알림 ===== */

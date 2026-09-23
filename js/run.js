@@ -24,37 +24,38 @@ let segs = [], ents = [], MAPEND = 0, GOALX = 0;
 const seg   = (x,len,y=0) => segs.push({ x0:x, x1:x+len, y });
 const ent   = (kind,x,y,o) => ents.push(Object.assign({ kind, x, y, gone:false, bx:x, by:y }, o));
 const spike = (x,y=0)  => ent('spike', x, y,      { w:48, h:54 });
-const bar   = (x,y=0)  => ent('bar',   x, y+56,   { w:58, h:420 });  // 슬라이드로만 통과
+const bar   = (x,y=0)  => ent('bar',   x, y+56,   { w:58, h:4000 }); // 슬라이드로만 통과 (넘어갈 수 없음)
 const jelly = (x,y)    => ent('jelly', x, y,      { w:30, h:30 });
 const big   = (x,y)    => ent('big',   x, y,      { w:52, h:52 });
 const jline = (x,y,n,gap=70) => { for(let i=0;i<n;i++) jelly(x+i*gap, y); };
-const jarc  = (x,n,base=0,spread=260,peak=170) => {
+/* 점프 궤적(최고 200, 거리 약 320)에 맞춘 포물선 */
+const jarc  = (x,n,base=0,spread=320,peak=172) => {
   for(let i=0;i<n;i++){ const t = n===1?0.5:i/(n-1);
-    jelly(x + t*spread, base + 46 + Math.sin(t*Math.PI)*peak); }
+    jelly(x + t*spread, base + 28 + 4*peak*t*(1-t)); }
 };
 
 const CHUNK = {
   warm(x){   seg(x,1200);                       jline(x+480,56,5);                                      return 1200; },
-  hop(x){    seg(x,1150);  spike(x+430);        jarc(x+340,7,0,320,180); jline(x+830,56,3);             return 1150; },
+  hop(x){    seg(x,1150);  spike(x+430);        jarc(x+340,7,0,320,172); jline(x+830,56,3);             return 1150; },
   duck(x){   seg(x,1150);  bar(x+450);          jline(x+370,30,6,58);    big(x+950,74);                 return 1150; },
-  gap1(x){   seg(x,560);   seg(x+840,520);      jarc(x+560,6,0,270,150);                                return 1360; },
+  gap1(x){   seg(x,560);   seg(x+840,520);      jarc(x+560,6,0,300,172);                                return 1360; },
   twin(x){   seg(x,1250);  spike(x+400); spike(x+800);
-             jarc(x+310,5,0,250,175); jarc(x+710,5,0,250,175);                                          return 1250; },
+             jarc(x+310,5,0,300,172); jarc(x+710,5,0,300,172);                                          return 1250; },
   rest(x){   seg(x,950);                        jline(x+320,56,6,70);    big(x+840,62);                 return 950;  },
   stair(x){  seg(x,600);   seg(x+700,460,150);  seg(x+1260,560);
-             jarc(x+600,5,0,260,150); jline(x+740,212,5,62);                                            return 1820; },
+             jarc(x+600,5,0,300,172); jline(x+740,212,5,62);                                            return 1820; },
   mix(x){    seg(x,1700);  spike(x+360); bar(x+940); spike(x+1440);
-             jarc(x+270,5,0,240,175); jline(x+860,30,4,60);                                             return 1700; },
-  gap2(x){   seg(x,520);   seg(x+840,320,120);  seg(x+1440,620);
-             jarc(x+520,5,0,300,180); jline(x+880,180,3,70); jarc(x+1160,5,0,300,180);                  return 2060; },
+             jarc(x+270,5,0,300,172); jline(x+860,30,4,60);                                             return 1700; },
+  gap2(x){   seg(x,540);   seg(x+820,340,80);  seg(x+1400,620);
+             jarc(x+500,5,0,300,172); jline(x+860,140,3,70); jarc(x+1120,5,0,300,172);                  return 2020; },
   zig(x){    seg(x,1700);  spike(x+320); spike(x+720); spike(x+1120);
-             jarc(x+240,4,0,220,185); jarc(x+640,4,0,220,185); jarc(x+1040,4,0,220,185); big(x+1500,66); return 1700; },
+             jarc(x+240,4,0,300,172); jarc(x+640,4,0,300,172); jarc(x+1040,4,0,300,172); big(x+1500,66); return 1700; },
   shelf(x){  seg(x,1350);  seg(x+520,400,170);  jline(x+560,232,5,70);   bar(x+1120); jline(x+1040,30,4,58); return 1350; },
   rush(x){   seg(x,2150);  bar(x+340); spike(x+900); bar(x+1450); spike(x+1980);
-             jline(x+270,30,5,55); jarc(x+810,5,0,230,180); jline(x+1380,30,5,55);                      return 2150; },
+             jline(x+270,30,5,55); jarc(x+810,5,0,300,172); jline(x+1380,30,5,55);                      return 2150; },
   finale(x){ seg(x,900);   seg(x+1200,400,150); seg(x+1800,760);
-             spike(x+320); bar(x+860); jarc(x+960,6,0,360,195); jline(x+1240,212,4,70);
-             jarc(x+1600,5,0,300,185); spike(x+2280); big(x+2420,78);                                   return 2560; },
+             spike(x+320); bar(x+680); jarc(x+960,6,0,360,172); jline(x+1240,212,4,70);
+             jarc(x+1600,5,0,300,172); spike(x+2280); big(x+2420,78);                                   return 2560; },
   goal(x){   seg(x,1000);  jline(x+180,56,5,62); ent('goal', x+520, 0, { w:70, h:230 });                return 1000; }
 };
 const MAP = ['warm','hop','duck','gap1','twin','rest','stair','mix','gap2','zig','shelf','rush','rest','finale','goal'];
@@ -234,7 +235,7 @@ function update(dt){
   }else if(held.slide && player.onGround) { player.sliding = true; player.slideT = 0; }
 
   /* 중력·점프 */
-  const prevY = player.y;
+  const prevY = player.y, prevX = player.x - v*dt;
   let gr = GRAV;
   if(skill === 'glide' && player.vy < 0) gr = held.jump ? 520 : 900;
   player.vy -= gr*dt;
@@ -266,9 +267,10 @@ function update(dt){
   /* 구덩이에 빠짐 */
   if(player.y < -300) fell();
 
-  /* 부딪힘 · 젤리 */
+  /* 부딪힘 · 젤리 — 한 프레임에 지나쳐버리지 않도록 이동 구간 전체를 본다 */
   const ph = player.sliding ? PH_SLIDE : PH;
-  const px0 = player.x - PW/2, px1 = player.x + PW/2, py0 = player.y, py1 = player.y + ph;
+  const px0 = Math.min(prevX, player.x) - PW/2, px1 = Math.max(prevX, player.x) + PW/2;
+  const py0 = Math.min(prevY, player.y), py1 = Math.max(prevY, player.y) + ph;
   for(const e of ents){
     if(e.gone) continue;
     if(e.x < player.x - 500) continue;
@@ -309,7 +311,9 @@ function update(dt){
   camY += (wantY - camY) * Math.min(1, dt*(wantY > camY ? 10 : 3.5));
 }
 
+const hits = [];
 function hurt(e){
+  hits.push({ x:Math.round(player.x), kind:e.kind, sliding:player.sliding, y:Math.round(player.y) });
   if(shield > 0){ shield--; player.inv = 1.3; e.gone = true; SFX.hit(); shake = 0.5;
                   pop(e.x, e.y + e.h/2, '#B9A7D9'); toastFx('보호막이 막았다!'); return; }
   player.hp--; player.inv = 1.5; combo = 0; e.gone = true;
@@ -318,6 +322,7 @@ function hurt(e){
   if(player.hp <= 0) finish(false);
 }
 function fell(){
+  hits.push({ x:Math.round(player.x), kind:'구덩이', y:Math.round(player.y) });
   player.hp--; combo = 0; SFX.hit(); shake = 1;
   if(player.hp <= 0){ finish(false); return; }
   const next = segs.find(s => s.x1 > player.x + 40) || segs[segs.length-1];
@@ -358,6 +363,22 @@ function drawSky(){
     g.quadraticCurveTo(x+150*SC, GYs-210*SC, x+340*SC, GYs);
     g.quadraticCurveTo(x+460*SC, GYs-120*SC, x+660*SC, GYs);
     g.closePath(); g.fill();
+  }
+  /* 동네 집들 */
+  const tw2 = 520, ho2 = (camX*0.58) % tw2;
+  for(let i=-1;i<W/(tw2*SC)+2;i++){
+    const x = i*tw2*SC - ho2*SC + 40*SC;
+    const hh = (120 + ((i*37)%3)*34)*SC, wwid = 150*SC;
+    const top = bushY - hh;
+    g.fillStyle = ['#F4E3C8','#EBD9F0','#DCEFF7'][Math.abs(i)%3];
+    g.beginPath(); g.rect(x, top, wwid, hh); g.fill();
+    g.strokeStyle = 'rgba(43,43,43,.45)'; g.lineWidth = LW()*0.7; g.stroke();
+    g.fillStyle = '#C9A06A';
+    g.beginPath(); g.moveTo(x-12*SC, top); g.lineTo(x+wwid/2, top-34*SC);
+    g.lineTo(x+wwid+12*SC, top); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#CDEBFA';
+    g.fillRect(x+22*SC, top+26*SC, 34*SC, 30*SC); g.strokeRect(x+22*SC, top+26*SC, 34*SC, 30*SC);
+    g.fillRect(x+92*SC, top+26*SC, 34*SC, 30*SC); g.strokeRect(x+92*SC, top+26*SC, 34*SC, 30*SC);
   }
   /* 가까운 덤불 */
   const bw = 380;
@@ -404,7 +425,24 @@ function drawGround(){
   }
 }
 
-/* 네잎클로버 — 젤리·체력 아이콘으로 씀 */
+/* 동전 — 배달하며 줍는 것 */
+function coin(cx, cy, r, big){
+  g.save(); g.translate(cx, cy);
+  g.strokeStyle = '#2B2B2B'; g.lineWidth = Math.min(r*0.34, LW()); g.lineJoin = 'round';
+  g.fillStyle = big ? '#FFD36E' : '#FFE08A';
+  g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = big ? '#FFE9A8' : '#FFF3C9';
+  g.beginPath(); g.arc(0, 0, r*0.68, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = '#7BC47F';
+  for(let i=0;i<4;i++){
+    g.save(); g.rotate(i*Math.PI/2 + Math.PI/4);
+    g.beginPath(); g.arc(0, -r*0.26, r*0.2, 0, 7); g.fill();
+    g.restore();
+  }
+  g.restore();
+}
+
+/* 네잎클로버 — 체력 아이콘으로 씀 */
 function clover(cx, cy, r, fill, line){
   g.save();
   g.translate(cx, cy);
@@ -464,28 +502,28 @@ function drawEnt(e){
     g.beginPath(); g.moveTo(x - w*0.9, y1 + 2*SC); g.lineTo(x + w*0.9, y1 + 2*SC); g.stroke(); g.restore();
   }
   else if(e.kind === 'jelly' || e.kind === 'big'){
-    const r = (e.kind === 'big' ? 26 : 15) * SC, bob = Math.sin(tick*3 + e.bx*0.02)*3*SC;
-    const cy = yb + bob;
-    if(e.kind === 'big'){
-      g.fillStyle = 'rgba(255,211,110,.5)';
-      g.beginPath(); g.arc(x, cy, r*1.5 + Math.sin(tick*5)*2*SC, 0, 7); g.fill();
-      clover(x, cy, r, '#FFD36E');
-    }else{
-      g.fillStyle = 'rgba(123,196,127,.22)';
-      g.beginPath(); g.arc(x, cy, r*1.25, 0, 7); g.fill();
-      clover(x, cy, r, '#7BC47F');
-    }
+    const r = (e.kind === 'big' ? 25 : 14) * SC, bob = Math.sin(tick*3 + e.bx*0.02)*3*SC;
+    const cy = yb + bob, spin = Math.abs(Math.cos(tick*2.2 + e.bx*0.01));
+    g.fillStyle = e.kind === 'big' ? 'rgba(255,211,110,.45)' : 'rgba(255,224,138,.3)';
+    g.beginPath(); g.arc(x, cy, r*(e.kind === 'big' ? 1.6 : 1.3), 0, 7); g.fill();
+    g.save(); g.translate(x, cy); g.scale(0.35 + 0.65*spin, 1);
+    coin(0, 0, r, e.kind === 'big'); g.restore();
   }
   else if(e.kind === 'goal'){
-    const y1 = sy(e.y + e.h);
-    g.strokeStyle = '#2B2B2B'; g.lineWidth = LW();
-    g.beginPath(); g.moveTo(x, yb); g.lineTo(x, y1); g.stroke();
-    g.fillStyle = '#FFB3C1';
-    g.beginPath(); g.moveTo(x, y1); g.lineTo(x + 120*SC, y1 + 26*SC); g.lineTo(x, y1 + 54*SC); g.closePath();
-    g.fill(); g.lineWidth = LW(); g.stroke();
+    const s2 = 120*SC, bx = x - s2*0.5, by = yb - s2;
+    g.fillStyle = '#FFF3D6';                                  // 배달할 집
+    g.beginPath(); g.rect(bx, by, s2, s2); g.fill(); g.stroke();
+    g.fillStyle = '#D98E6A';
+    g.beginPath(); g.moveTo(bx - s2*0.14, by); g.lineTo(x, by - s2*0.42);
+    g.lineTo(bx + s2*1.14, by); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#C87A58';
+    g.beginPath(); g.rect(x - s2*0.16, yb - s2*0.55, s2*0.32, s2*0.55); g.fill(); g.stroke();
+    g.fillStyle = '#CDEBFA';
+    g.beginPath(); g.rect(bx + s2*0.12, by + s2*0.16, s2*0.22, s2*0.22); g.fill(); g.stroke();
+    g.beginPath(); g.rect(bx + s2*0.66, by + s2*0.16, s2*0.22, s2*0.22); g.fill(); g.stroke();
     g.fillStyle = '#2B2B2B'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = `700 ${22*SC}px Gaegu, sans-serif`;
-    g.fillText('꺅!', x + 44*SC, y1 + 27*SC);
+    g.font = `700 ${20*SC}px Gaegu, sans-serif`;
+    g.fillText('배달 도착', x, by - s2*0.58);
   }
   g.restore();
 }
@@ -530,6 +568,12 @@ function drawPlayer(){
 
   g.translate(x, yb - bob - (me.float || 0) * SC * 0.4);
   g.rotate(rot); g.scale((me.flip === false ? 1 : -1) * sqx, sqy);
+  /* 등에 멘 배달 가방 */
+  g.fillStyle = '#D98E6A'; g.strokeStyle = '#2B2B2B'; g.lineWidth = LW();
+  const bw2 = baseH*0.36;
+  g.beginPath(); g.rect(baseH*0.10, -baseH*0.82, bw2, bw2*0.86); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(baseH*0.10, -baseH*0.82+bw2*0.32);
+  g.lineTo(baseH*0.10+bw2, -baseH*0.82+bw2*0.32); g.stroke();
   if(im && im.complete && im.naturalWidth) g.drawImage(im, -baseH*0.5, -baseH, baseH, baseH);
   else { g.fillStyle = '#F2E8D9'; g.strokeStyle = '#2B2B2B'; g.lineWidth = LW();
          g.beginPath(); g.ellipse(0, -baseH*0.4, baseH*0.3, baseH*0.36, 0, 0, 7); g.fill(); g.stroke(); }
@@ -570,8 +614,8 @@ function drawHud(){
   g.fillStyle = '#2B2B2B';
   g.font = `700 ${34*k}px Gaegu, sans-serif`;
   g.fillText(Math.floor(score).toLocaleString(), 16*k, 40*k);
-  /* 젤리 */
-  clover(26*k, 58*k, 11*k, '#7BC47F');
+  /* 동전 */
+  coin(26*k, 58*k, 11*k, false);
   g.fillStyle = '#2B2B2B'; g.font = `700 ${20*k}px Gaegu, sans-serif`;
   g.fillText('× ' + jellyN + (combo > 2 ? '   ' + combo + ' 연속!' : ''), 41*k, 65*k);
   /* 체력 */
@@ -633,7 +677,7 @@ function start(o){
   me = o.look || CHARS[0];
   stScale = (STAGES[o.stage || 0] || STAGES[0]).scale * 0.95 + 0.1;
   onEnd = o.onEnd;
-  sync(); reset(); state = 'play';
+  sync(); reset(); hits.length = 0; state = 'play';
   held.jump = held.slide = false;
   runBgmStart();
 }
@@ -672,7 +716,7 @@ function pointer(yFrac, down){
 }
 function quit(){ state = 'over'; runBgmStop(); goHome(); }
 return { start, frame, key, pad, pointer, quit, resize: sync,
-         state: () => state, peek: () => ({ state, player, ents, segs, speed, energy, skill,
+         state: () => state, peek: () => ({ state, player, ents, segs, speed, energy, skill, hits,
                                             score, jellyN, dist, maxCombo, MAPEND, GOALX }),
          debug: { doJump, setSlide, useSkill } };
 })();

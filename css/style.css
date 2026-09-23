@@ -501,3 +501,63 @@ img{max-width:100%;}
 #toast span{font-size:12px;color:var(--ink-soft);}
 #toast.pop{animation:toastPop .35s cubic-bezier(.2,1.5,.5,1);}
 @keyframes toastPop{0%{transform:translateX(-50%) scale(.6);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}
+
+/* 애정도 */
+.love{display:flex;align-items:center;gap:2px;font-size:13px;}
+.love i{font-style:normal;font-size:15px;line-height:1;filter:grayscale(1);opacity:.35;}
+.love i.on{filter:none;opacity:1;}
+
+/* 아래 돌봄 버튼 바 */
+#careBar{position:absolute;left:0;right:0;bottom:0;z-index:6;display:flex;gap:6px;
+         padding:8px 10px;box-sizing:border-box;justify-content:center;flex-wrap:wrap;
+         background:linear-gradient(rgba(255,253,246,.05),rgba(255,253,246,.92));}
+#careBar[hidden]{display:none!important;}
+.carebtn{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;
+         border:3px solid var(--ink);border-radius:16px;background:var(--cream);cursor:pointer;
+         padding:5px 12px 7px;font-family:var(--body);box-shadow:3px 4px 0 var(--ink);
+         transition:transform .1s ease, box-shadow .1s ease;min-width:64px;}
+.carebtn:hover{transform:translate(1px,2px);box-shadow:2px 3px 0 var(--ink);}
+.carebtn:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--ink);}
+.carebtn b{font-family:var(--display);font-size:16px;line-height:1.1;}
+.carebtn i{font-style:normal;font-size:10px;color:var(--ink-soft);}
+.carebtn .ic{width:22px;height:22px;border:3px solid var(--ink);border-radius:50%;box-sizing:border-box;}
+.carebtn.off{opacity:.45;}
+.carebtn.want{background:#FFF3D6;animation:wantPulse 1.2s ease-in-out infinite;}
+.carebtn.want::after{content:'!';position:absolute;top:-9px;right:-7px;width:19px;height:19px;
+      border:3px solid var(--ink);border-radius:50%;background:var(--pink);
+      font-family:var(--display);font-weight:700;font-size:13px;line-height:15px;text-align:center;}
+@keyframes wantPulse{0%,100%{box-shadow:3px 4px 0 var(--ink)}50%{box-shadow:3px 4px 0 var(--ink),0 0 0 4px rgba(255,179,193,.55)}}
+.c-feed{background:#F5B971;} .c-wash{background:#A9D9F0;} .c-play{background:#FFB3C1;}
+.c-sleep{background:#B9A7D9;} .c-water{background:#8CCB86;} .c-clean{background:#D9C4A0;}
+
+/* 알바 고르기 */
+.jobrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px;width:100%;}
+.jobcard{position:relative;border:3px solid var(--ink);border-radius:22px;cursor:pointer;overflow:hidden;
+         padding:0 0 12px;display:flex;flex-direction:column;align-items:center;gap:4px;
+         font-family:var(--body);background:var(--cream);box-shadow:5px 6px 0 var(--ink);
+         transition:transform .12s ease,box-shadow .12s ease;}
+.jobcard:hover{transform:translate(2px,3px);box-shadow:3px 4px 0 var(--ink);}
+.jobcard .sign{width:100%;padding:5px 0 7px;font-family:var(--display);font-weight:700;font-size:14px;
+               border-bottom:3px solid var(--ink);letter-spacing:1px;}
+.jobcard canvas{width:104px;height:78px;margin:4px 0 -2px;}
+.jobcard .nm{font-family:var(--display);font-weight:700;font-size:24px;line-height:1;}
+.jobcard .meta{font-size:12px;color:var(--ink-soft);}
+.jobcard .pay{font-size:11.5px;color:var(--ink-soft);border-top:3px dotted #E4DDCC;margin-top:4px;
+              padding-top:5px;width:86%;}
+.jobcard .go{margin-top:6px;font-family:var(--display);font-weight:700;font-size:17px;
+             border:3px solid var(--ink);border-radius:13px;background:var(--pink);padding:1px 16px 3px;}
+
+/* 집 업그레이드 */
+.house{display:flex;gap:12px;align-items:center;border:3px solid var(--ink);border-radius:20px;
+       background:linear-gradient(#FFFDF6,#F6EFE0);padding:10px 12px;width:100%;box-sizing:border-box;}
+.house canvas{width:96px;height:72px;flex:none;}
+.house .info{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.house .info b{font-family:var(--display);font-size:21px;}
+.house .info span{font-size:12px;color:var(--ink-soft);}
+.house .info .now{font-size:11.5px;color:var(--clover);}
+.house .btn{flex:none;}
+.housesteps{display:flex;gap:5px;margin-top:3px;}
+.housesteps i{width:24px;height:7px;border:3px solid var(--ink);border-radius:99px;box-sizing:border-box;}
+.housesteps i.on{background:var(--clover);}
+
+.paytop{font-family:var(--display);font-size:15px;color:var(--ink);letter-spacing:1px;}

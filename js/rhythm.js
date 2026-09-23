@@ -38,7 +38,7 @@ function groundY(){ return H * 0.86; }
 
 /* 시작 · 끝 */
 function startGame(){
-  closeModal(); $('topbar').hidden = true;
+  closeModal(); $('topbar').hidden = true; $('careBar').hidden = true;
   initAudio(); bgmStop(); if(ctx.state === 'suspended') ctx.resume();
   char = look();
   notes = buildChart(song, diff.id);
@@ -46,7 +46,7 @@ function startGame(){
   APPROACH = diff.approach / settings.speed;
   WIN = { perfect:BASE_WIN.perfect * diff.wmul, great:BASE_WIN.great * diff.wmul, good:BASE_WIN.good * diff.wmul };
   score = 0; combo = 0; maxCombo = 0; tally = { perfect:0, great:0, good:0, miss:0 }; accSum = 0;
-  fx = []; texts = []; parts = []; flyers = []; lastSection = -1;
+  fx = []; texts = []; parts = []; flyers = []; bubs = []; lastSection = -1;
   stars = Array.from({ length:40 }, () => ({ x:Math.random(), y:Math.random() * 0.55,
                                              r:Math.random() * 1.6 + 0.7, p:Math.random() * 6.3 }));
   charState = 'run'; charTimer = 0;
@@ -82,8 +82,9 @@ function endGame(){
 /* 보상 정산 — 두 미니게임이 같이 쓴다 */
 function payOut(pay, exp, elId){
   addClover(pay); addExp(exp); afterOuting(); save(); refreshBar(); sfxCoin(4);
-  $(elId).innerHTML = CLOVER_SVG + '<b>+' + pay + '</b> 클로버 · <b>+' + exp + '</b> 경험치' +
-    '<small>배부름 −18 · 기운 −22 · 깨끗함 −14</small>';
+  $(elId).innerHTML = '<span class="paytop">오늘의 알바비</span>' + CLOVER_SVG +
+    '<b>+' + pay + '</b> 클로버 · <b>+' + exp + '</b> 경험치' +
+    '<small>일하고 왔더니 배부름 −18 · 기운 −22 · 깨끗함 −16</small>';
 }
 
 function pause(){
@@ -154,12 +155,94 @@ function miss(n){
   charState = 'fall'; charTimer = 0.7;
 }
 
+/* ===============================================================
+   설거지 알바 배경 — 분식집 주방
+   =============================================================== */
+function drawKitchen(t, prog){
+  const k = uiK();
+  /* 타일 벽 */
+  const wg = g.createLinearGradient(0, 0, 0, H);
+  wg.addColorStop(0, '#EAF6FB'); wg.addColorStop(1, '#DCEDF4');
+  g.fillStyle = wg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(120,150,165,.28)'; g.lineWidth = LW() * 0.5;
+  const ts = Math.max(34, H * 0.085);
+  for(let y = 0; y < H * 0.78; y += ts){
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    const off = (Math.round(y / ts) % 2) * ts * 0.5;
+    for(let x = -ts; x < W + ts; x += ts){
+      g.beginPath(); g.moveTo(x + off, y); g.lineTo(x + off, y + ts); g.stroke();
+    }
+  }
+  /* 선반과 접시 */
+  const shY = H * 0.12;
+  g.fillStyle = '#D9B884'; ink();
+  g.fillRect(W * 0.70, shY, W * 0.30, H * 0.022); g.strokeRect(W * 0.70, shY, W * 0.30, H * 0.022);
+  for(let i = 0; i < 4; i++){
+    const x = W * 0.735 + i * W * 0.068, r = Math.min(W * 0.028, H * 0.05);
+    g.fillStyle = ['#FFFDF6', '#FFE3EC', '#DFF0FA', '#EAF6E4'][i % 4];
+    g.beginPath(); g.ellipse(x, shY - r * 0.75, r, r * 0.95, 0, 0, 7); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(43,43,43,.3)';
+    g.beginPath(); g.ellipse(x, shY - r * 0.75, r * 0.55, r * 0.5, 0, 0, 7); g.stroke(); ink();
+  }
+  /* 오른쪽 창문 */
+  const wx = W * 0.10, wy = H * 0.17, ws = Math.min(W * 0.07, H * 0.12);
+  g.fillStyle = '#CDEBFA'; ink();
+  roundRect(wx - ws, wy - ws * 0.8, ws * 2, ws * 1.6, ws * 0.14); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.7)';
+  g.beginPath(); g.arc(wx - ws * 0.3, wy - ws * 0.2, ws * 0.3, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(wx, wy - ws * 0.8); g.lineTo(wx, wy + ws * 0.8);
+  g.moveTo(wx - ws, wy); g.lineTo(wx + ws, wy); g.stroke();
+  /* 싱크대 상판 */
+  const cy = judgeY() + laneW() * 0.55;
+  g.fillStyle = '#C9DCE4'; g.fillRect(0, cy, W, H - cy);
+  ink(); g.beginPath(); g.moveTo(0, cy); g.lineTo(W, cy); g.stroke();
+  g.fillStyle = '#AFC9D4'; g.fillRect(0, cy + (H - cy) * 0.42, W, (H - cy) * 0.58);
+  g.beginPath(); g.moveTo(0, cy + (H - cy) * 0.42); g.lineTo(W, cy + (H - cy) * 0.42); g.stroke();
+  /* 수도꼭지 */
+  const fx0 = fieldX() + fieldW() + 26 * k;
+  if(fx0 < W - 40 * k){
+    g.strokeStyle = '#8FA8B4'; g.lineWidth = LW() * 1.6;
+    g.beginPath(); g.moveTo(fx0, cy); g.lineTo(fx0, cy - H * 0.16);
+    g.quadraticCurveTo(fx0, cy - H * 0.22, fx0 - W * 0.05, cy - H * 0.2); g.stroke();
+    ink();
+  }
+  /* 김 */
+  g.save(); g.globalAlpha = .22; g.fillStyle = '#FFFFFF';
+  for(let i = 0; i < 5; i++){
+    const p = (t * 0.22 + i * 0.2) % 1;
+    const x = W * (0.1 + i * 0.2) + Math.sin(t * 1.5 + i) * 18;
+    g.beginPath(); g.arc(x, cy - p * H * 0.55, (18 + p * 26) * k * 0.7, 0, 7); g.fill();
+  }
+  g.restore();
+}
+
+/* 떠오르는 비눗방울 */
+let bubs = [];
+function bubbles(dt, playing){
+  if(playing && Math.random() < dt * 9)
+    bubs.push({ x: Math.random() * W, y: H * 0.98, r: (5 + Math.random() * 11) * uiK(),
+                v: 26 + Math.random() * 60, p: Math.random() * 6.3, life: 1 });
+  for(let i = bubs.length - 1; i >= 0; i--){
+    const b = bubs[i];
+    b.y -= b.v * dt; b.life -= dt * 0.22;
+    if(b.y < -30 || b.life <= 0){ bubs.splice(i, 1); continue; }
+    g.save(); g.globalAlpha = Math.max(0, Math.min(0.55, b.life * 0.6));
+    g.fillStyle = '#FFFFFF'; g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = LW() * 0.5;
+    const x = b.x + Math.sin(b.p + b.y * 0.02) * 9;
+    g.beginPath(); g.arc(x, b.y, b.r, 0, 7); g.fill(); g.stroke();
+    g.globalAlpha *= 0.9; g.fillStyle = '#FFFFFF';
+    g.beginPath(); g.arc(x - b.r * 0.3, b.y - b.r * 0.35, b.r * 0.22, 0, 7); g.fill();
+    g.restore();
+  }
+}
+
 /* 한 프레임 */
 function stepPlay(dt, ts){
   const playing = mode === 'play', frozen = mode === 'pause';
   const t = (playing || frozen) ? nowT() : ts / 1000;
   const prog = Math.max(0, Math.min(1, t / song.end));
   const th = lerpTheme(THEMES[song.theme], prog);
+  th.ink = '#2B2B2B';
 
   if(playing){
     const look2 = t + 0.25;
@@ -170,7 +253,7 @@ function stepPlay(dt, ts){
         n.holding = false; n.done = true; score += 40 * diff.mult;
         combo++; maxCombo = Math.max(maxCombo, combo); hitSound(n.lane, 'perfect');
         fx.push({ x:laneX(n.lane), y:judgeY(), r:12, life:1, kind:'perfect' });
-        texts.length = 0; texts.push({ x:W * 0.5, y:judgeY() - H * 0.24, life:1, s:'쓰왜!' });
+        texts.length = 0; texts.push({ x:W * 0.5, y:judgeY() - H * 0.24, life:1, s:'뽀득!' });
       }
       if(n.holding && !laneHold[n.lane] && t < n.t + n.dur - 0.12){
         n.holding = false; n.done = true;
@@ -188,10 +271,8 @@ function stepPlay(dt, ts){
   let shx = 0, shy = 0;
   if(shakeT > 0){ shakeT -= dt; if(!REDUCED){ shx = (Math.random() - .5) * 7; shy = (Math.random() - .5) * 7; } }
   g.save(); g.translate(W / 2 + shx, H / 2 + shy); g.scale(pulse, pulse); g.translate(-W / 2, -H / 2);
-  scene(Math.max(0, t), th, prog);
-  if(playing) spawnParticles(dt, th);
-  drawFlyers(playing ? dt : dt * 0.6, th);
-  drawParticles(playing ? dt : dt * 0.6);
+  drawKitchen(Math.max(0, t), prog);
+  bubbles(playing ? dt : dt * 0.5, playing);
   laneField(t, th); drawNotes(t, th); drawChar(t, playing ? dt : 0, th);
   drawFx(playing ? dt : 0, th); drawHud(t, th);
   g.restore();
@@ -241,7 +322,7 @@ function spawnHitFx(lane, v){
 function laneField(t,th){
   const x0=fieldX(), fw=fieldW(), top=fieldTop(), jy=judgeY(), lw=laneW();
   g.save();
-  g.globalAlpha=0.66; g.fillStyle='#FFFDF6';
+  g.globalAlpha=0.42; g.fillStyle='#F2FAFD';
   roundRect(x0,top,fw,H-top-H*0.03,18); g.fill(); g.globalAlpha=1;
   g.lineWidth=LW(); g.strokeStyle=th.ink; g.globalAlpha=.5;
   roundRect(x0,top,fw,H-top-H*0.03,18); g.stroke(); g.globalAlpha=1;
@@ -318,7 +399,7 @@ function drawNotes(t,th){
       g.globalAlpha=1; g.lineWidth=LW(); g.strokeStyle=th.ink;
       roundRect(x-nw*0.34, a, nw*0.68, Math.max(6,bnd-a), nw*0.3); g.stroke();
       // 머리·꼬리 알약
-      if(!n.judged){ g.fillStyle=col; roundRect(x-nw/2,noteY(n.t)-nh/2,nw,nh,nh*0.45); g.fill(); g.stroke(); }
+      if(!n.judged) plate(x, noteY(n.t), nw*0.46, col, th.ink);
       g.fillStyle='#FFFDF6'; roundRect(x-nw*0.34,yTail-nh*0.34,nw*0.68,nh*0.68,nh*0.3); g.fill(); g.stroke();
       if(n.holding && Math.random()<0.35)
         fx.push({x:x+(Math.random()-.5)*nw,y:jy,life:.6,kind:'dust',
@@ -328,12 +409,22 @@ function drawNotes(t,th){
       const y=noteY(n.t);
       if(y>jy+H*0.18) continue;
       if(y<top-30) continue;
-      g.fillStyle=col; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.fill();
-      g.lineWidth=LW(); g.strokeStyle=th.ink; roundRect(x-nw/2,y-nh/2,nw,nh,nh*0.45); g.stroke();
-      g.globalAlpha=.5; g.fillStyle='#FFFDF6';
-      roundRect(x-nw*0.36,y-nh*0.30,nw*0.72,nh*0.26,nh*0.13); g.fill(); g.globalAlpha=1;
+      plate(x, y, nw*0.46, col, th.ink);
     }
   }
+}
+/* 접시 한 장 */
+function plate(x, y, r, col, ink2){
+  g.fillStyle=col;
+  g.beginPath(); g.ellipse(x, y, r, r*0.8, 0, 0, 6.3); g.fill();
+  g.lineWidth=LW(); g.strokeStyle=ink2; g.stroke();
+  g.fillStyle='#FFFDF6'; g.globalAlpha=.85;
+  g.beginPath(); g.ellipse(x, y, r*0.6, r*0.46, 0, 0, 6.3); g.fill(); g.globalAlpha=1;
+  g.lineWidth=LW()*0.7; g.strokeStyle=ink2;
+  g.beginPath(); g.ellipse(x, y, r*0.6, r*0.46, 0, 0, 6.3); g.stroke();
+  g.globalAlpha=.55; g.fillStyle='#FFFFFF';
+  g.beginPath(); g.ellipse(x-r*0.3, y-r*0.3, r*0.18, r*0.1, -0.5, 0, 6.3); g.fill();
+  g.globalAlpha=1;
 }
 
 /* ===== 캐릭터 ===== */

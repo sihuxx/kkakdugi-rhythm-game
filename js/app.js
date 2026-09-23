@@ -11,6 +11,7 @@ function showScreen(el){
   [$('introScreen'), $('resultScreen'), $('runResult'), $('pauseScreen')]
     .forEach(s => { if(s) s.hidden = s !== el; });
   $('pauseBtn').hidden = !(mode === 'play');
+  $('careBar').hidden = !(mode === 'home' && !el);
 }
 
 /* ===== 위쪽 상태바 ===== */
@@ -20,6 +21,9 @@ function refreshBar(){
   $('barName').textContent = d.name;
   $('barStage').textContent = st.name;
   $('barLook').textContent = look().name;
+  $('barHouse').textContent = HOUSE().name;
+  const hearts = Math.round((S.dugi.love || 0) / 20);
+  $('loveHearts').innerHTML = [0,1,2,3,4].map(i => '<i class="' + (i < hearts ? 'on' : '') + '">♥</i>').join('');
   $('expFill').style.width = Math.round(stageProg(d.exp) * 100) + '%';
   $('expCap').textContent = STAGES[si + 1]
     ? Math.max(0, STAGES[si + 1].need - d.exp) + ' 경험치 남음'
@@ -35,16 +39,16 @@ function refreshBar(){
 function goHome(){
   mode = 'home';
   showScreen(null);
-  $('topbar').hidden = false; $('runPad').hidden = true;
+  $('topbar').hidden = false; $('runPad').hidden = true; $('careBar').hidden = false;
   $('skipBtn').hidden = true; $('tapHint').hidden = true;
-  seedDust(); refreshBar(); bgmStart();
+  seedDust(); relayout(); refreshBar(); paintCareBar(); bgmStart();
 }
 
 /* ===== 꺅두기런 ===== */
 function startRun(){
   closeModal(); initAudio(); bgmStop();
   if(ctx && ctx.state === 'suspended') ctx.resume();
-  mode = 'run'; $('topbar').hidden = true; showScreen(null);
+  mode = 'run'; $('topbar').hidden = true; $('careBar').hidden = true; showScreen(null);
   $('runPad').hidden = !(W < 760 || matchMedia('(pointer:coarse)').matches);
   DugiRun.start({ look: look(), stage: stageOf(S.dugi.exp), onEnd: runEnd });
 }
@@ -54,7 +58,7 @@ function runEnd(r){
   const pay = Math.round((r.jelly * 3.6 + r.dist / 110 + (r.cleared ? 90 + r.hp * 45 : 0)) * payMult());
   const exp = Math.round(7 + r.jelly * 0.16 + r.dist / 950 + (r.cleared ? 12 : 0));
   const grade = r.cleared ? (r.score > 6000 ? 'S' : r.score > 4500 ? 'A' : r.score > 3200 ? 'B' : 'C') : '-';
-  $('runTitle').textContent = r.cleared ? '도착!' : '아야…';
+  $('runTitle').textContent = r.cleared ? '배달 완료!' : '배달 실패…';
   $('runArt').src = SRC[r.cleared ? look().run : look().fall];
   $('runScore').textContent = Math.round(r.score).toLocaleString('ko-KR');
   $('rDist').textContent = Math.floor(r.dist / 10) + ' m';
@@ -72,7 +76,7 @@ function runEnd(r){
 function askName(){
   showScreen($('introScreen'));
   $('introName').value = S.dugi.name;
-  $('topbar').hidden = true;
+  $('topbar').hidden = true; $('careBar').hidden = true;
   setTimeout(() => $('introName').focus(), 200);
 }
 function finishIntro(){
@@ -171,7 +175,7 @@ function audioKick(){
 $('shopBtn').onclick = () => openModal('shop');
 $('dexBtn').onclick  = () => openModal('wardrobe');
 $('setBtn').onclick  = () => openModal('settings');
-$('outBtn').onclick  = () => openModal('out');
+$('outBtn').onclick  = () => openModal('job');
 $('modalClose').onclick = closeModal;
 modal.addEventListener('pointerdown', e => { if(e.target === modal) closeModal(); });
 $('pauseBtn').onclick = () => pause();
