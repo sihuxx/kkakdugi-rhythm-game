@@ -2,10 +2,10 @@
 /* 세이브·경제·성장 — 꺅두기 하우스 */
 
 /* ===============================================================
-   세이브 v2 — 두기 한 마리 · 클로버 · 모습 · 가구
+   세이브 v3 — 두기 한 마리 · 마음 · 클로버 · 집
    =============================================================== */
-const SAVE_KEY = 'ggakdugi.v2';
-const START_LOOKS = ['wool', 'proud', 'baby'];
+const SAVE_KEY = 'ggakdugi.v3';
+const START_LOOKS = ['proud', 'wool', 'baby'];
 
 const DEFAULT_KEYS = ['KeyA', 'KeyS', 'KeyK', 'KeyL'];
 const SKINS = {
@@ -16,21 +16,27 @@ const SKINS = {
 
 function freshSave(){
   return {
-    v: 2,
+    v: 3,
     clover: 500,
-    look: 'wool',
+    look: 'proud',
     own: [...START_LOOKS],
     pity: 0,
     house: 0,
-    dugi: { name:'두기', exp:0, full:70, clean:70, fun:70, energy:70, love:0 },
+    wall: 'w0', floor: 'f0',
+    walls: ['w0'], floors: ['f0'],
+    dugi: { name:'두기', love:0, full:70, clean:70, fun:70, energy:70,
+            fav: FOODS[Math.floor(Math.random() * FOODS.length)].id, plant:0 },
     furn: [...BASE_FURN],
-    req: null,
-    jobs: 0,
-    claimed: [],
-    skins: ['basic'],
+    pos: {},                       // 꾸미기 모드에서 옮긴 자리
+    bag: {},                       // 소모품
+    career: { dish:0, deliver:0, cafe:0 },
+    best: {}, runBest: 0, cafeBest: 0,
+    course: 'town',
+    stat: { pet:0, job:0, earn:0 },
+    daily: null,
+    done: [],                      // 받은 업적
+    claimed: [], skins: ['basic'],
     named: false,
-    best: {},                                  // 리듬게임 곡별 최고점
-    runBest: 0,
     settings: { keys:[...DEFAULT_KEYS], speed:1.0, offset:0, skin:'basic',
                 volMusic:0.8, volBgm:0.6, volSfx:0.9 }
   };
@@ -40,10 +46,12 @@ let S = freshSave();
 (function loadSave(){
   try{
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-    if(raw && raw.v === 2){
+    if(raw && raw.v === 3){
       S = Object.assign(freshSave(), raw);
       S.dugi = Object.assign(freshSave().dugi, raw.dugi || {});
       S.settings = Object.assign(freshSave().settings, raw.settings || {});
+      S.career = Object.assign({ dish:0, deliver:0, cafe:0 }, raw.career || {});
+      S.stat = Object.assign({ pet:0, job:0, earn:0 }, raw.stat || {});
       const ids = new Set(CHARS.map(c => c.id));
       S.own = (S.own || []).filter(id => ids.has(id));
       if(!S.own.length) S.own = [...START_LOOKS];
@@ -55,93 +63,154 @@ let S = freshSave();
 })();
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
 
-/* 편하게 쓰는 별칭 */
 const settings = S.settings;
-const dugi = () => S.dugi;
 const look = () => CHARS.find(c => c.id === S.look) || CHARS[0];
 const owns = id => S.own.includes(id);
 const hasFurn = id => S.furn.includes(id);
+const favFood = () => FOODS.find(f => f.id === S.dugi.fav) || FOODS[0];
 
-/* 가구가 주는 보너스 합 */
+/* 가구 보너스 */
 function boost(kind){
   let v = 0;
   for(const id of S.furn){ const f = FURN(id); if(f && f.boost && f.boost[kind]) v += f.boost[kind]; }
   return v;
 }
-/* 컨디션 — 스탯 평균 (미니게임 보상 배율에 쓰임) */
 function condition(){
   const d = S.dugi;
   return (d.full + d.clean + d.fun + d.energy) / 400;
 }
-/* 알바비 배율 — 컨디션 + 애정도 + 가구 */
-function payMult(){ return (0.62 + 0.36 * condition() + 0.18 * (S.dugi.love / 100)) * (1 + boost('pay')); }
-function addLove(n){ S.dugi.love = Math.max(0, Math.min(100, (S.dugi.love || 0) + n)); }
+/* 알바 시급 = 컨디션 + 마음 레벨 + 가구 + 그 알바 경력 */
+function payMult(jobId){
+  const career = jobId ? careerPay(S.career[jobId] || 0) : 1;
+  return (0.62 + 0.38 * condition()) * (1 + loveBonus(S.dugi.love)) * (1 + boost('pay')) * career;
+}
 
 function addStat(k, v){
   const d = S.dugi;
   d[k] = Math.max(0, Math.min(100, (d[k] || 0) + v));
 }
-function addClover(n){ S.clover = Math.max(0, Math.round(S.clover + n)); }
-
-/* 경험치 — 단계가 오르면 알린다 */
-function addExp(n){
-  const before = stageOf(S.dugi.exp);
-  S.dugi.exp = Math.round(S.dugi.exp + n * (1 + boost('exp')));
-  const after = stageOf(S.dugi.exp);
-  if(after > before){
-    grewUp = 2.6;
-    toast(S.dugi.name + '가 자랐어요!', STAGES[after].name + ' · ' + STAGES[after].note);
-    sfxGrow();
-  }
-  return after > before;
+function addClover(n){
+  S.clover = Math.max(0, Math.round(S.clover + n));
+  if(n > 0){ S.stat.earn = (S.stat.earn || 0) + n; bumpDaily('earn', n); }
 }
-let grewUp = 0;
 
-/* 알바하고 오면 배고프고 지저분해진다 */
-function afterOuting(){
-  addStat('full', -18); addStat('energy', -22); addStat('clean', -16); addStat('fun', 8);
-  S.jobs = (S.jobs || 0) + 1;
+/* ===== 마음 ===== */
+let leveledUp = 0;
+function addLove(n){
+  const before = loveLv(S.dugi.love);
+  S.dugi.love = Math.max(0, Math.round((S.dugi.love + n * (1 + boost('love'))) * 10) / 10);
+  const after = loveLv(S.dugi.love);
+  if(after > before){
+    leveledUp = 2.6;
+    const u = LOVE_UNLOCK[after] || {};
+    if(u.furn && !hasFurn(u.furn)) S.furn.push(u.furn);
+    toast('마음 레벨 ' + after + '!', u.txt || '두기가 더 좋아해요');
+    sfxGrow();
+    checkAchieve();
+  }
+}
+const canFollow = () => loveLv(S.dugi.love) >= 3;
+const petMul = () => (loveLv(S.dugi.love) >= 6 ? 1.5 : 1);
+
+/* ===== 알바 다녀온 뒤 ===== */
+function afterOuting(jobId){
+  addStat('full', -16); addStat('energy', -20); addStat('clean', -14); addStat('fun', 6);
+  if(jobId){ S.career[jobId] = (S.career[jobId] || 0) + 1; }
+  S.stat.job = (S.stat.job || 0) + 1;
+  bumpDaily('job', 1); checkAchieve();
   newRequest(true);
   save();
+}
+function careerUp(jobId, before){
+  const a = careerLv(before), b = careerLv(S.career[jobId] || 0);
+  if(b > a){ toast(JOB(jobId).name + ' 경력 ' + b + '!', '시급이 올랐어요 · 새 코스가 열릴지도?');
+             sfxCoin(4); }
 }
 
 /* ===== 두기가 먼저 조르기 ===== */
 const REQ_LINE = { feed:'배고파요…', wash:'꿉꿉해요', play:'심심해!', sleep:'졸려요…',
-                   water:'화분이 목말라 보여요', clean:'방이 지저분해요' };
+                   water:'화분이 목말라요', clean:'방이 지저분해요' };
 function newRequest(force){
   if(S.req && !force) return;
-  const d = S.dugi;
-  const want = [];
+  const d = S.dugi, want = [];
   if(d.full < 55) want.push('feed');
   if(d.clean < 55) want.push('wash', 'clean');
   if(d.energy < 55) want.push('sleep');
   if(d.fun < 60) want.push('play', 'water');
-  const pick = want.length ? want[Math.floor(Math.random() * want.length)]
-                           : CARE_ORDER[Math.floor(Math.random() * CARE_ORDER.length)];
-  if(!want.length && Math.random() < 0.5){ S.req = null; return; }
-  S.req = { kind: pick, done: false };
+  if(!want.length){ S.req = Math.random() < 0.4
+      ? { kind: CARE_ORDER[Math.floor(Math.random() * CARE_ORDER.length)] } : null; return; }
+  S.req = { kind: want[Math.floor(Math.random() * want.length)] };
   save();
 }
 function clearRequest(kind){
-  if(S.req && S.req.kind === kind && !S.req.done){
+  if(S.req && S.req.kind === kind){
     S.req = null;
-    addClover(35); addLove(4);
-    toast('원하던 걸 해줬어요!', '보너스 클로버 35 · 애정도 +4');
+    addClover(35); addLove(5);
+    toast('원하던 걸 해줬어요!', '보너스 클로버 35 · 마음 +5');
     sfxCoin(3);
     return true;
   }
   return false;
 }
 
-/* ===== 집 업그레이드 ===== */
+/* ===== 집 ===== */
 function upgradeHouse(){
   const nxt = HOUSES[(S.house || 0) + 1];
   if(!nxt) return false;
   if(S.clover < nxt.price){ sfxNo(); toast('클로버가 모자라요', nxt.name + '까지 ' +
       (nxt.price - S.clover).toLocaleString('ko-KR') + ' 더'); return false; }
-  addClover(-nxt.price); S.house = (S.house || 0) + 1; save();
-  toast(nxt.name + '으로 이사!', nxt.note); sfxGrow();
+  addClover(-nxt.price); S.house = (S.house || 0) + 1; S.pos = {}; save();
+  toast(nxt.name + '으로 이사!', nxt.note); sfxGrow(); checkAchieve();
   return true;
+}
+
+/* ===== 오늘의 할 일 ===== */
+function today(){ const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function rollDaily(){
+  const pool = DAILY_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  S.daily = { date: today(), list: pool.map(d => ({ id:d.id, n:0, got:false })) };
+  save();
+}
+function checkDaily(){ if(!S.daily || S.daily.date !== today()) rollDaily(); }
+function dailyDef(id){ return DAILY_POOL.find(d => d.id === id); }
+function bumpDaily(kind, n){
+  if(!S.daily) return;
+  let changed = false;
+  S.daily.list.forEach(row => {
+    const def = dailyDef(row.id);
+    if(!def || row.got) return;
+    if(def.kind !== kind) return;
+    row.n += n;
+    if(row.n >= def.need){
+      row.got = true; changed = true;
+      S.clover += def.pay; addLove(3);
+      toast('오늘의 할 일 완료!', def.txt + ' · 클로버 +' + def.pay);
+      sfxCoin(4);
+    }
+  });
+  if(changed) save();
+  if(typeof paintDaily === 'function') paintDaily();
+}
+
+/* ===== 업적 ===== */
+function achieveVal(kind){
+  if(kind === 'pet')   return S.stat.pet || 0;
+  if(kind === 'job')   return S.stat.job || 0;
+  if(kind === 'love')  return loveLv(S.dugi.love);
+  if(kind === 'dex')   return S.own.length;
+  if(kind === 'furn')  return S.furn.length;
+  if(kind === 'house') return S.house || 0;
+  return 0;
+}
+function checkAchieve(){
+  ACHIEVES.forEach(a => {
+    if(S.done.includes(a.id)) return;
+    if(achieveVal(a.kind) >= a.need){
+      S.done.push(a.id); S.clover += a.pay;
+      toast('업적 달성!', a.txt + ' · 클로버 +' + a.pay);
+      sfxCoin(5); save();
+    }
+  });
 }
 
 /* ===== 알림 ===== */
@@ -171,6 +240,6 @@ function checkRewards(){
       toast('도감 ' + r.n + '종 달성!', r.txt + ' 받았어요');
     }
   });
-  save();
+  checkAchieve(); save();
 }
 function nextReward(){ return DEX_REWARDS.find(r => !S.claimed.includes(r.id)); }

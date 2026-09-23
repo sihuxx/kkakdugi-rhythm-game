@@ -4,30 +4,28 @@
 /* ===============================================================
    셸 — 화면 전환 · 입력 · 메인 루프
    =============================================================== */
-let mode = 'home';                 // home · play · pause · result · cut · run · runresult
+let mode = 'home';          // home · play · pause · result · cut · run · runresult · cafe · caferesult
 let last = performance.now();
 
 function showScreen(el){
   [$('introScreen'), $('resultScreen'), $('runResult'), $('pauseScreen')]
     .forEach(s => { if(s) s.hidden = s !== el; });
   $('pauseBtn').hidden = !(mode === 'play');
-  $('careBar').hidden = !(mode === 'home' && !el);
+  $('careBar').hidden = !(mode === 'home' && !el && !mini && !deco);
 }
 
 /* ===== 위쪽 상태바 ===== */
 function refreshBar(){
-  const d = S.dugi, si = stageOf(d.exp), st = STAGES[si];
+  const d = S.dugi, lv = loveLv(d.love);
   $('barClover').innerHTML = CLOVER_SVG + '<b>' + S.clover.toLocaleString('ko-KR') + '</b>';
   $('barName').textContent = d.name;
-  $('barStage').textContent = st.name;
+  $('barStage').textContent = '마음 Lv' + lv;
   $('barLook').textContent = look().name;
   $('barHouse').textContent = HOUSE().name;
-  const hearts = Math.round((S.dugi.love || 0) / 20);
+  $('expFill').style.width = Math.round(loveProg(d.love) * 100) + '%';
+  $('expCap').textContent = lv >= LOVE_MAX ? '최고 단짝!' : ('다음 레벨까지 ' + Math.ceil(loveNext(d.love)));
+  const hearts = Math.min(5, Math.round(lv / 2));
   $('loveHearts').innerHTML = [0,1,2,3,4].map(i => '<i class="' + (i < hearts ? 'on' : '') + '">♥</i>').join('');
-  $('expFill').style.width = Math.round(stageProg(d.exp) * 100) + '%';
-  $('expCap').textContent = STAGES[si + 1]
-    ? Math.max(0, STAGES[si + 1].need - d.exp) + ' 경험치 남음'
-    : '다 컸어요!';
   STATS.forEach(s => {
     const bar = $('st_' + s.id);
     if(!bar) return;
@@ -37,29 +35,31 @@ function refreshBar(){
 }
 
 function goHome(){
-  mode = 'home';
+  mode = 'home'; deco = false; mini = null;
   showScreen(null);
-  $('topbar').hidden = false; $('runPad').hidden = true; $('careBar').hidden = false;
+  $('topbar').hidden = false; $('runPad').hidden = true;
   $('skipBtn').hidden = true; $('tapHint').hidden = true;
-  seedDust(); relayout(); refreshBar(); paintCareBar(); bgmStart();
+  $('decoBtn').classList.remove('on');
+  checkDaily(); seedDust(); relayout(); refreshBar(); paintCareBar(); paintDaily(); bgmStart();
 }
 
-/* ===== 꺅두기런 ===== */
+/* ===== 배달 알바 ===== */
 function startRun(){
   closeModal(); initAudio(); bgmStop();
   if(ctx && ctx.state === 'suspended') ctx.resume();
   mode = 'run'; $('topbar').hidden = true; $('careBar').hidden = true; showScreen(null);
   $('runPad').hidden = !(W < 760 || matchMedia('(pointer:coarse)').matches);
-  DugiRun.start({ look: look(), stage: stageOf(S.dugi.exp), onEnd: runEnd });
+  DugiRun.start({ look: look(), course: S.course, onEnd: runEnd });
 }
 function runEnd(r){
   mode = 'runresult';
   $('runPad').hidden = true;
-  const pay = Math.round((r.jelly * 3.6 + r.dist / 110 + (r.cleared ? 90 + r.hp * 45 : 0)) * payMult());
-  const exp = Math.round(7 + r.jelly * 0.16 + r.dist / 950 + (r.cleared ? 12 : 0));
+  const co = COURSE(S.course), before = S.career.deliver || 0;
+  const pay = Math.round((r.jelly * 3.6 + r.dist / 110 + (r.cleared ? 90 + r.hp * 45 : 0))
+                         * co.pay * payMult('deliver'));
   const grade = r.cleared ? (r.score > 6000 ? 'S' : r.score > 4500 ? 'A' : r.score > 3200 ? 'B' : 'C') : '-';
   $('runTitle').textContent = r.cleared ? '배달 완료!' : '배달 실패…';
-  $('runArt').src = SRC[r.cleared ? look().run : look().fall];
+  $('runArt').src = SRC[look().run];
   $('runScore').textContent = Math.round(r.score).toLocaleString('ko-KR');
   $('rDist').textContent = Math.floor(r.dist / 10) + ' m';
   $('rJelly').textContent = r.jelly + ' / ' + r.total;
@@ -67,7 +67,35 @@ function runEnd(r){
   $('rGrade').textContent = grade;
   if(r.score > (S.runBest || 0)){ S.runBest = Math.round(r.score); $('runBest').textContent = '새 기록!'; }
   else $('runBest').textContent = '최고 기록 ' + (S.runBest || 0).toLocaleString('ko-KR');
-  payOut(pay, exp, 'runReward');
+  payOut(pay, 'deliver', 'runReward', co.name);
+  careerUp('deliver', before);
+  showScreen($('runResult'));
+  bgmStart();
+}
+
+/* ===== 카페 알바 ===== */
+function startCafe(){
+  closeModal(); initAudio(); bgmStop();
+  if(ctx && ctx.state === 'suspended') ctx.resume();
+  mode = 'cafe'; $('topbar').hidden = true; $('careBar').hidden = true; showScreen(null);
+  CafeGame.start({ onEnd: cafeEnd });
+}
+function cafeEnd(r){
+  mode = 'caferesult';
+  const before = S.career.cafe || 0;
+  const pay = Math.round((r.score / 9 + r.tip * 12 + 40) * payMult('cafe'));
+  $('runTitle').textContent = r.rounds >= 5 ? '오늘도 수고!' : '조금 아쉬워요';
+  $('runArt').src = SRC[look().run];
+  $('runScore').textContent = Math.round(r.score).toLocaleString('ko-KR');
+  $('rDist').textContent = r.rounds + '명';
+  $('rJelly').textContent = r.tip + '잔';
+  $('rCombo').textContent = 3 - r.miss + ' / 3';
+  $('rGrade').textContent = r.rounds >= 7 ? 'S' : r.rounds >= 5 ? 'A' : r.rounds >= 3 ? 'B' : 'C';
+  if(r.score > (S.cafeBest || 0)){ S.cafeBest = Math.round(r.score); $('runBest').textContent = '새 기록!'; }
+  else $('runBest').textContent = '최고 기록 ' + (S.cafeBest || 0).toLocaleString('ko-KR');
+  $('runAgain').textContent = '한 번 더';
+  payOut(pay, 'cafe', 'runReward', '카페 알바');
+  careerUp('cafe', before);
   showScreen($('runResult'));
   bgmStart();
 }
@@ -83,7 +111,27 @@ function finishIntro(){
   const v = ($('introName').value || '').trim().slice(0, 6) || '두기';
   S.dugi.name = v; S.named = true; save();
   initAudio(); goHome();
-  toast(v + '와(과) 함께!', '집을 돌아다니며 E로 돌봐주세요');
+  toast(v + '와(과) 함께!', '두기를 쓰다듬어 보세요');
+}
+
+/* ===== 오늘의 할 일 ===== */
+function paintDaily(){
+  const el = $('dailyList'); if(!el) return;
+  checkDaily();
+  el.innerHTML = '';
+  let left = 0;
+  S.daily.list.forEach(row => {
+    const def = dailyDef(row.id); if(!def) return;
+    if(!row.got) left++;
+    const li = document.createElement('div');
+    li.className = 'dq' + (row.got ? ' got' : '');
+    li.innerHTML = '<span class="chk">' + (row.got ? '✓' : '') + '</span>' +
+      '<b>' + def.txt + '</b><i>' + Math.min(row.n, def.need) + '/' + def.need + '</i>' +
+      '<span class="pay">' + CLOVER_SVG + def.pay + '</span>';
+    el.appendChild(li);
+  });
+  const btn = $('dailyBtn');
+  if(btn) btn.classList.toggle('alert', left > 0);
 }
 
 /* ===== 입력 ===== */
@@ -98,9 +146,14 @@ addEventListener('keydown', e => {
     if(['Space','ArrowUp','ArrowDown','KeyW','KeyS','KeyE'].includes(e.code)) e.preventDefault();
     return;
   }
+  if(mode === 'cafe'){
+    if(e.code === 'Escape'){ CafeGame.quit(); return; }
+    CafeGame.key(e.code); return;
+  }
   if(mode === 'home' && !modalOpen){
-    if(KMAP[e.code]){ e.preventDefault(); keys[KMAP[e.code]] = true; home.target = null; return; }
-    if(e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter'){
+    if(mini && e.code === 'Escape'){ closeMini(); return; }
+    if(KMAP[e.code] && !mini){ e.preventDefault(); keys[KMAP[e.code]] = true; home.target = null; return; }
+    if((e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') && !mini){
       e.preventDefault(); if(home.near) act(home.near); return; }
   }
   if(modalOpen && e.code === 'Escape'){ closeModal(); return; }
@@ -132,30 +185,40 @@ addEventListener('keyup', e => {
 });
 addEventListener('blur', () => { for(const k in keys) keys[k] = false; });
 
-cv.addEventListener('pointerdown', e => {
-  audioKick();
+let ptrDown = false;
+function canvasXY(e){
   const r = cv.getBoundingClientRect();
-  const mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
-  if(mode === 'run'){ DugiRun.pointer(my / H, true); return; }
+  return { x:(e.clientX - r.left) / r.width * W, y:(e.clientY - r.top) / r.height * H };
+}
+cv.addEventListener('pointerdown', e => {
+  audioKick(); ptrDown = true;
+  const p = canvasXY(e);
+  if(mode === 'run'){ DugiRun.pointer(p.y / H, true); return; }
+  if(mode === 'cafe'){ CafeGame.pointer(p.x, p.y); return; }
   if(mode === 'cut'){ advanceCut(); return; }
   if(mode === 'home'){
-    let spot = null;
-    for(const s of homeSpots()) if(Math.abs(s.x * W - mx) < W * 0.05) spot = s;
-    if(spot){ home.target = { x:spot.x, y:0.78 }; home.autoAct = spot; }
-    else home.target = { x:Math.max(0.03, Math.min(0.97, mx / W)),
-                         y:Math.max(0.60, Math.min(0.90, 0.6 + (my - walkTop()) / (walkBot() - walkTop()) * 0.3)) };
-    return;
+    if(mini && mini.kind === 'feed'){ miniClick(p.x, p.y); return; }
+    homeDown(p.x, p.y); return;
   }
   if(mode !== 'play') return;
-  const ln = Math.max(0, Math.min(3, Math.floor((mx - fieldX()) / laneW())));
+  const ln = Math.max(0, Math.min(3, Math.floor((p.x - fieldX()) / laneW())));
   touchLane[e.pointerId] = ln; laneHold[ln] = true; hit(ln);
 });
+cv.addEventListener('pointermove', e => {
+  if(mode !== 'home') return;
+  const p = canvasXY(e);
+  homeMove(p.x, p.y, ptrDown);
+});
 cv.addEventListener('pointerup', e => {
+  ptrDown = false;
   if(mode === 'run'){ DugiRun.pointer(0, false); return; }
+  if(mode === 'home'){ homeUp(); return; }
   const ln = touchLane[e.pointerId];
   if(ln !== undefined){ laneHold[ln] = false; delete touchLane[e.pointerId]; }
 });
 cv.addEventListener('pointercancel', e => {
+  ptrDown = false;
+  if(mode === 'home'){ homeUp(); return; }
   const ln = touchLane[e.pointerId];
   if(ln !== undefined){ laneHold[ln] = false; delete touchLane[e.pointerId]; }
 });
@@ -163,12 +226,12 @@ document.addEventListener('visibilitychange', () => { if(document.hidden && mode
 
 document.addEventListener('pointerdown', e => {
   audioKick();
-  if(e.target.closest('button,.songrow,.dcard,.lv,.cover,.sinfo,.shopcard,.outcard')) uiClick();
+  if(e.target.closest('button,.songrow,.dcard,.lv,.cover,.sinfo,.shopcard,.jobcard,.tab')) uiClick();
 }, true);
 function audioKick(){
   initAudio();
   if(mode !== 'pause' && !cdTimer && ctx.state === 'suspended') ctx.resume();
-  if(mode === 'home' || mode === 'result' || mode === 'runresult') bgmStart();
+  if(mode === 'home' || mode === 'result' || mode === 'runresult' || mode === 'caferesult') bgmStart();
 }
 
 /* 버튼 */
@@ -176,6 +239,14 @@ $('shopBtn').onclick = () => openModal('shop');
 $('dexBtn').onclick  = () => openModal('wardrobe');
 $('setBtn').onclick  = () => openModal('settings');
 $('outBtn').onclick  = () => openModal('job');
+$('dailyBtn').onclick = () => { $('dailyPanel').hidden = !$('dailyPanel').hidden; paintDaily(); };
+$('decoBtn').onclick = () => {
+  deco = !deco; mini = null;
+  $('decoBtn').classList.toggle('on', deco);
+  $('careBar').hidden = deco || mode !== 'home';
+  toast(deco ? '꾸미기 모드' : '꾸미기 끝', deco ? '가구를 끌어서 옮기세요' : '자리를 저장했어요');
+  if(!deco) save();
+};
 $('modalClose').onclick = closeModal;
 modal.addEventListener('pointerdown', e => { if(e.target === modal) closeModal(); });
 $('pauseBtn').onclick = () => pause();
@@ -183,12 +254,13 @@ $('resumeBtn').onclick = () => resumePlay();
 $('quitBtn').onclick = () => quitPlay();
 $('againBtn').onclick = () => startGame();
 $('homeBtn').onclick = () => goHome();
-$('runAgain').onclick = () => startRun();
+$('runAgain').onclick = () => { if(mode === 'caferesult') startCafe(); else startRun(); };
 $('runHome').onclick = () => goHome();
 $('introGo').onclick = () => finishIntro();
 $('introName').addEventListener('keydown', e => { if(e.key === 'Enter') finishIntro(); });
 $('skipBtn').onclick = () => skipCut();
 $('fsBtn').onclick = () => toggleFs();
+$('miniClose').onclick = () => closeMini();
 function toggleFs(){
   try{
     if(!document.fullscreenElement){
@@ -200,7 +272,6 @@ function toggleFs(){
 document.addEventListener('fullscreenchange', () => {
   document.body.classList.toggle('fs', !!document.fullscreenElement); resize();
 });
-/* 런 조작 버튼 */
 [['rJump', 'jump'], ['rSlide', 'slide'], ['rSkill', 'skill']].forEach(([id, k]) => {
   const el = $(id); if(!el) return;
   el.addEventListener('pointerdown', e => { e.preventDefault(); DugiRun.pad(k, true); });
@@ -211,10 +282,16 @@ document.addEventListener('fullscreenchange', () => {
 /* ===== 메인 루프 ===== */
 function frame(ts){
   const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-  if(mode === 'cut' && cut){ drawCut(dt); }
-  else if(mode === 'run' || mode === 'runresult'){ DugiRun.frame(dt, mode === 'run'); }
-  else if(mode === 'play' || mode === 'pause' || mode === 'result'){ stepPlay(dt, ts); }
-  else { updateHome(dt); drawHome(dt); }
+  try{
+    if(mode === 'cut' && cut){ drawCut(dt); }
+    else if(mode === 'run' || mode === 'runresult'){ DugiRun.frame(dt, mode === 'run'); }
+    else if(mode === 'cafe' || mode === 'caferesult'){ CafeGame.frame(dt, mode === 'cafe'); }
+    else if(mode === 'play' || mode === 'pause' || mode === 'result'){ stepPlay(dt, ts); }
+    else { updateHome(dt); drawHome(dt); }
+    $('miniClose').hidden = !(mode === 'home' && mini);
+  }catch(err){
+    console.error('frame', err);            // 한 번 삐끗해도 게임은 계속 돈다
+  }
   requestAnimationFrame(frame);
 }
 
@@ -222,6 +299,7 @@ function frame(ts){
 seedScenery();
 resize();
 applySkin();
+checkDaily();
 if(S.named) goHome(); else askName();
 refreshBar();
 requestAnimationFrame(frame);

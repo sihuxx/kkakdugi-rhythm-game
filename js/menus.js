@@ -17,7 +17,7 @@ let freshIds = new Set();
 /* ===== 뽑기 로직 ===== */
 const PULL1 = 110, PULL10 = 1000;
 const REFUND = { N:30, R:60, SR:120 };
-const RATE = [['N', 55], ['R', 32], ['SR', 13]];
+const RATE = [['N', 65], ['R', 27], ['SR', 8]];
 const POOL = rk => CHARS.filter(c => c.rank === rk);
 function rollRank(force){
   if(force) return force;
@@ -34,7 +34,7 @@ function pull(n){
     const force = (n === 10 && i === 9 && !got.some(x => x.rank !== 'N')) ? 'R' : null;
     let rk = rollRank(force);
     S.pity = rk === 'SR' ? 0 : S.pity + 1;
-    if(S.pity >= 60){ rk = 'SR'; S.pity = 0; }
+    if(S.pity >= 80){ rk = 'SR'; S.pity = 0; }
     const pool = POOL(rk), c = pool[Math.floor(Math.random() * pool.length)];
     const isNew = !owns(c.id);
     if(isNew){ S.own.push(c.id); freshIds.add(c.id); }
@@ -106,7 +106,7 @@ function openLookDetail(c2){
       '<p class="desc">' + (has ? c2.meta : '아직 만나지 못한 모습이에요.') + '</p>' +
       '<div class="facts">' +
         '<span>뽑기 확률 <b>' + (c2.p ? c2.p + '%' : '기본 보유') + '</b></span>' +
-        '<span>런에서 <b>' + skillOf(c2).name + '</b></span>' +
+        '<span>배달 스킬 <b>' + skillOf(c2).name + '</b></span>' +
         '<span>보유 <b>' + (has ? '가지고 있음' : '없음') + '</b></span>' +
       '</div><div class="row"></div></div>';
   body.appendChild(d);
@@ -125,14 +125,60 @@ function openLookDetail(c2){
   row.appendChild(back);
 }
 
-/* ===== 상점 (가구) ===== */
+/* ===== 상점 ===== */
+let shopTab = 'furn';
 function buildShop(body){
   const top = document.createElement('div'); top.className = 'gtop';
   top.innerHTML = CLOVER_SVG + '<b>' + S.clover.toLocaleString('ko-KR') + '</b>' +
-    '<span>가구를 사면 집이 예뻐지고 돌봄 효과도 올라가요</span>';
+    '<span>집을 넓히고 가구로 꾸며요</span>';
   body.appendChild(top);
 
-  /* 집 업그레이드 */
+  const tabs = document.createElement('div'); tabs.className = 'tabs';
+  [['furn', '가구'], ['item', '소모품'], ['room', '벽지·바닥'], ['house', '이사']].forEach(([id, nm]) => {
+    const b2 = document.createElement('button');
+    b2.type = 'button'; b2.className = 'tab' + (shopTab === id ? ' on' : '');
+    b2.textContent = nm;
+    b2.onclick = () => { shopTab = id; openModal('shop'); };
+    tabs.appendChild(b2);
+  });
+  body.appendChild(tabs);
+
+  if(shopTab === 'house') return buildHouseTab(body);
+  if(shopTab === 'item')  return buildItemTab(body);
+  if(shopTab === 'room')  return buildRoomTab(body);
+
+  const grid = document.createElement('div'); grid.className = 'shopgrid'; body.appendChild(grid);
+  FURNITURE.filter(f => !f.base && !f.lock).forEach(f => {
+    const has = hasFurn(f.id);
+    const locked = (f.need || 0) > (S.house || 0);
+    const full = !has && !locked && S.furn.length >= HOUSE().slots;
+    const b2 = document.createElement('button');
+    b2.type = 'button';
+    b2.className = 'shopcard' + (has ? ' own' : '') + (locked ? ' locked' : '') +
+                   (S.clover < f.price && !has && !locked ? ' poor' : '');
+    b2.innerHTML = '<span class="pic"><canvas width="96" height="96"></canvas></span>' +
+      '<span class="nm">' + f.name + '</span>' +
+      '<span class="meta">' + (locked ? HOUSES[f.need].name + '부터' : f.desc) +
+      '<br><i>' + ZONE_NAME[f.zone] + (f.on === 'wall' ? ' 벽' : '') + '</i></span>' +
+      '<span class="price">' + (has ? '가지고 있음' : locked ? '🔒' : CLOVER_SVG + f.price) + '</span>';
+    grid.appendChild(b2);
+    drawFurnIcon(b2.querySelector('canvas'), f.id);
+    b2.onclick = () => {
+      if(has){ toast('이미 집에 있어요', f.name); return; }
+      if(locked){ sfxNo(); toast('집이 좁아요', HOUSES[f.need].name + '으로 이사하면 놓을 수 있어요'); return; }
+      if(full){ sfxNo(); toast('자리가 없어요', '이사하면 자리가 늘어나요'); return; }
+      if(S.clover < f.price){ sfxNo(); toast('클로버가 모자라요', '알바해서 벌어보세요'); return; }
+      addClover(-f.price); S.furn.push(f.id); save(); relayout(); refreshBar(); sfxCoin(3);
+      checkAchieve();
+      toast(f.name + ' 구입!', ZONE_NAME[f.zone] + '에 놓았어요');
+      openModal('shop');
+    };
+  });
+  const cap = document.createElement('p'); cap.className = 'hint';
+  cap.textContent = '가구 자리 ' + S.furn.length + ' / ' + HOUSE().slots + '칸 · 위쪽 꾸미기 버튼으로 자리를 옮길 수 있어요';
+  body.appendChild(cap);
+}
+function buildHouseTab(body){
   const cur = HOUSE(), nxt = HOUSES[(S.house || 0) + 1];
   const hs = document.createElement('div'); hs.className = 'house';
   hs.innerHTML = '<canvas width="192" height="144"></canvas>' +
@@ -144,36 +190,98 @@ function buildShop(body){
   body.appendChild(hs);
   drawHouseIcon(hs.querySelector('canvas'), nxt ? (S.house || 0) + 1 : (S.house || 0));
   if(nxt){
-    const b = document.createElement('button');
-    b.className = 'btn small'; b.type = 'button';
-    b.innerHTML = '이사 · ' + nxt.price.toLocaleString('ko-KR');
-    b.onclick = () => { if(upgradeHouse()){ relayout(); refreshBar(); openModal('shop'); } };
-    hs.appendChild(b);
+    const b2 = document.createElement('button');
+    b2.className = 'btn small'; b2.type = 'button';
+    b2.innerHTML = '이사 · ' + nxt.price.toLocaleString('ko-KR');
+    b2.onclick = () => { if(upgradeHouse()){ relayout(); refreshBar(); openModal('shop'); } };
+    hs.appendChild(b2);
   }
+}
+function buildItemTab(body){
   const grid = document.createElement('div'); grid.className = 'shopgrid'; body.appendChild(grid);
-  FURNITURE.filter(f => !f.base).forEach(f => {
-    const has = hasFurn(f.id);
-    const locked = (f.need || 0) > (S.house || 0);
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'shopcard' + (has ? ' own' : '') + (locked ? ' locked' : '') +
-                  (S.clover < f.price && !has && !locked ? ' poor' : '');
-    b.innerHTML = '<span class="pic"><canvas width="96" height="96"></canvas></span>' +
-      '<span class="nm">' + f.name + '</span>' +
-      '<span class="meta">' + (locked ? HOUSES[f.need].name + '부터 놓을 수 있어요' : f.desc) + '</span>' +
-      '<span class="price">' + (has ? '가지고 있음' : locked ? '🔒' : CLOVER_SVG + f.price) + '</span>';
-    grid.appendChild(b);
-    drawFurnIcon(b.querySelector('canvas'), f.id);
-    b.onclick = () => {
-      if(has){ toast('이미 집에 있어요', f.name); return; }
-      if(locked){ sfxNo(); toast('집이 좁아요', HOUSES[f.need].name + '으로 이사하면 놓을 수 있어요'); return; }
-      if(S.clover < f.price){ sfxNo(); toast('클로버가 모자라요', '알바해서 벌어보세요'); return; }
-      addClover(-f.price); S.furn.push(f.id); save(); relayout(); refreshBar(); sfxCoin(3);
-      toast(f.name + ' 구입!', '집에 놓았어요');
+  ITEMS.forEach(it => {
+    const have = S.bag[it.id] || 0;
+    const b2 = document.createElement('button');
+    b2.type = 'button'; b2.className = 'shopcard' + (S.clover < it.price ? ' poor' : '');
+    b2.innerHTML = '<span class="pic"><canvas width="96" height="96"></canvas></span>' +
+      '<span class="nm">' + it.name + (have ? ' ×' + have : '') + '</span>' +
+      '<span class="meta">' + it.use + '</span>' +
+      '<span class="price">' + CLOVER_SVG + it.price + '</span>';
+    grid.appendChild(b2);
+    drawItemIcon(b2.querySelector('canvas'), it.id);
+    b2.onclick = () => {
+      if(S.clover < it.price){ sfxNo(); toast('클로버가 모자라요', ''); return; }
+      addClover(-it.price); S.bag[it.id] = (S.bag[it.id] || 0) + 1; save(); refreshBar(); sfxCoin(2);
+      toast(it.name + ' 구입!', '가방에 넣었어요');
       openModal('shop');
     };
   });
+  const use = document.createElement('div'); use.className = 'bagrow';
+  const owned = Object.keys(S.bag).filter(k => S.bag[k] > 0);
+  use.innerHTML = '<b>가방</b>' + (owned.length ? '' : '<span>아직 비어 있어요</span>');
+  owned.forEach(id => {
+    const it = ITEM(id); if(!it) return;
+    const b2 = document.createElement('button');
+    b2.className = 'btn ghost small'; b2.type = 'button';
+    b2.textContent = it.name + ' 쓰기 (' + S.bag[id] + ')';
+    b2.onclick = () => {
+      for(const k in it.add) addStat(k, it.add[k]);
+      addLove(it.love || 2);
+      S.bag[id]--; if(!S.bag[id]) delete S.bag[id];
+      save(); refreshBar(); paintCareBar(); sfxCare('feed');
+      toast(it.name + ' 사용!', it.use);
+      openModal('shop');
+    };
+    use.appendChild(b2);
+  });
+  body.appendChild(use);
 }
+function buildRoomTab(body){
+  const mk = (list, ownList, cur, setter, label) => {
+    const h = document.createElement('p'); h.className = 'hint'; h.textContent = label;
+    body.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'shopgrid'; body.appendChild(grid);
+    list.forEach(w => {
+      const has = ownList.includes(w.id);
+      const b2 = document.createElement('button');
+      b2.type = 'button';
+      b2.className = 'shopcard' + (has ? ' own' : '') + (cur === w.id ? ' sel' : '');
+      b2.innerHTML = '<span class="swatchbig" style="background:linear-gradient(' + w.a + ',' + w.b + ')"></span>' +
+        '<span class="nm">' + w.name + '</span>' +
+        '<span class="price">' + (has ? (cur === w.id ? '사용 중' : '고르기') : CLOVER_SVG + w.price) + '</span>';
+      grid.appendChild(b2);
+      b2.onclick = () => {
+        if(!has){
+          if(S.clover < w.price){ sfxNo(); toast('클로버가 모자라요', ''); return; }
+          addClover(-w.price); ownList.push(w.id); sfxCoin(2);
+        }
+        setter(w.id); save(); refreshBar(); openModal('shop');
+      };
+    });
+  };
+  mk(WALLS, S.walls, S.wall, id => S.wall = id, '벽지');
+  mk(FLOORS, S.floors, S.floor, id => S.floor = id, '바닥');
+}
+function drawItemIcon(cvs, id){
+  const c = cvs.getContext('2d'), sw = cvs.width, sh = cvs.height;
+  const og = g, oW = W, oH = H; g = c; W = sw; H = sh;
+  c.clearRect(0, 0, sw, sh); ink(3.2);
+  const cx = sw / 2, cy = sh * 0.56, r = sh * 0.24;
+  if(id === 'snack'){ g.fillStyle = '#F6C88B'; rrect(cx - r, cy - r * 0.7, r * 2, r * 1.4, r * 0.4);
+    g.fill(); g.stroke(); g.fillStyle = '#C9784F';
+    [[-0.4, -0.1], [0.3, 0.2], [0, -0.35]].forEach(([a, b2]) => {
+      g.beginPath(); g.arc(cx + a * r, cy + b2 * r, r * 0.16, 0, 7); g.fill(); }); }
+  else if(id === 'soap'){ g.fillStyle = '#A9D9F0'; rrect(cx - r, cy - r * 0.6, r * 2, r * 1.2, r * 0.3);
+    g.fill(); g.stroke(); g.fillStyle = '#FFFFFF';
+    [[-0.6, -1.1, 0.3], [0.1, -1.4, 0.24], [0.6, -1.0, 0.2]].forEach(([a, b2, rr]) => {
+      g.beginPath(); g.arc(cx + a * r, cy + b2 * r, r * rr, 0, 7); g.fill(); g.stroke(); }); }
+  else if(id === 'toy'){ g.fillStyle = '#FFB3C1'; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = '#FFFDF6'; g.beginPath(); g.arc(cx - r * 0.3, cy - r * 0.3, r * 0.22, 0, 7); g.fill(); }
+  else { g.fillStyle = '#E8DFF5'; rrect(cx - r * 1.1, cy - r * 0.6, r * 2.2, r * 1.2, r * 0.5);
+    g.fill(); g.stroke(); }
+  g = og; W = oW; H = oH;
+}
+
 /* 작은 캔버스에 집 그리기 */
 function drawHouseIcon(cvs, level){
   const c = cvs.getContext('2d'), sw = cvs.width, sh = cvs.height;
@@ -210,24 +318,85 @@ function drawFurnIcon(cvs, id){
 /* ===== 알바 고르기 ===== */
 function buildJobs(body){
   const info = document.createElement('p'); info.className = 'outinfo';
-  info.innerHTML = '컨디션 <b>' + Math.round(condition() * 100) + '%</b> · 애정도 <b>' +
-                   Math.round(S.dugi.love) + '</b> → 시급 <b>x' + payMult().toFixed(2) + '</b>' +
+  info.innerHTML = '컨디션 <b>' + Math.round(condition() * 100) + '%</b> · 마음 <b>Lv' +
+                   loveLv(S.dugi.love) + '</b>' +
                    '<br><small>잘 먹고 잘 잔 두기가 일도 잘해요. 일하고 오면 배고프고 지저분해집니다.</small>';
   body.appendChild(info);
   const row = document.createElement('div'); row.className = 'jobrow'; body.appendChild(row);
   JOBS.forEach(j => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'jobcard';
-    b.innerHTML = '<span class="sign" style="background:' + j.color + '">' + j.place + '</span>' +
+    const n = S.career[j.id] || 0, lv = careerLv(n);
+    const b2 = document.createElement('button');
+    b2.type = 'button'; b2.className = 'jobcard';
+    b2.innerHTML = '<span class="sign" style="background:' + j.color + '">' + j.place + '</span>' +
       '<canvas width="208" height="156"></canvas>' +
       '<span class="nm">' + j.name + '</span>' +
       '<span class="meta">' + j.desc + '</span>' +
-      '<span class="pay">' + j.pay + '</span>' +
+      '<span class="lvrow">경력 <b>Lv' + lv + '</b> · ' + n + '번 · 시급 x' +
+        (payMult(j.id)).toFixed(2) + '</span>' +
       '<span class="go">일하러 가기</span>';
-    row.appendChild(b);
-    drawJobIcon(b.querySelector('canvas'), j.id);
-    b.onclick = () => { if(j.game === 'rhythm') openModal('song'); else startRun(); };
+    row.appendChild(b2);
+    drawJobIcon(b2.querySelector('canvas'), j.id);
+    b2.onclick = () => {
+      if(j.game === 'rhythm') openModal('song');
+      else if(j.game === 'run') openModal('course');
+      else startCafe();
+    };
   });
+}
+/* 배달 코스 고르기 */
+function buildCourses(body){
+  const lv = careerLv(S.career.deliver || 0);
+  const row = document.createElement('div'); row.className = 'jobrow'; body.appendChild(row);
+  COURSES.forEach(c => {
+    const locked = lv < c.lv;
+    const b2 = document.createElement('button');
+    b2.type = 'button'; b2.className = 'jobcard' + (locked ? ' locked' : '');
+    b2.innerHTML = '<span class="sign" style="background:' +
+        (locked ? '#D8D2C4' : c.id === 'night' ? '#7E7FA6' : c.id === 'hill' ? '#F5B971' : '#A9D9F0') +
+        '">' + (locked ? '경력 Lv' + c.lv + '부터' : '코스') + '</span>' +
+      '<canvas width="208" height="130"></canvas>' +
+      '<span class="nm">' + c.name + '</span>' +
+      '<span class="meta">' + c.desc + '</span>' +
+      '<span class="lvrow">체력 ' + c.hp + ' · 속도 ' + Math.round(c.v0 / 4) +
+        ' · 시급 x' + c.pay.toFixed(2) + '</span>' +
+      '<span class="go">' + (locked ? '잠김' : '출발!') + '</span>';
+    row.appendChild(b2);
+    drawCourseIcon(b2.querySelector('canvas'), c.id);
+    b2.onclick = () => {
+      if(locked){ sfxNo(); toast('아직 못 가요', '배달 경력 Lv' + c.lv + '부터'); return; }
+      S.course = c.id; save(); startRun();
+    };
+  });
+}
+function drawCourseIcon(cvs, id){
+  const c = cvs.getContext('2d'), sw = cvs.width, sh = cvs.height;
+  const og = g, oW = W, oH = H; g = c; W = sw; H = sh;
+  const CO = COURSE(id);
+  const gr = c.createLinearGradient(0, 0, 0, sh);
+  gr.addColorStop(0, CO.sky[0]); gr.addColorStop(1, CO.sky[1]);
+  c.fillStyle = gr; c.fillRect(0, 0, sw, sh);
+  ink(3);
+  g.fillStyle = '#CFE7C6';
+  if(id === 'hill'){
+    g.beginPath(); g.moveTo(0, sh * 0.8); g.lineTo(sw * 0.3, sh * 0.8);
+    g.lineTo(sw * 0.45, sh * 0.6); g.lineTo(sw * 0.7, sh * 0.6);
+    g.lineTo(sw * 0.85, sh * 0.82); g.lineTo(sw, sh * 0.82); g.lineTo(sw, sh); g.lineTo(0, sh);
+    g.closePath(); g.fill(); g.stroke();
+  }else{
+    g.fillRect(0, sh * 0.78, sw, sh * 0.22);
+    g.beginPath(); g.moveTo(0, sh * 0.78); g.lineTo(sw, sh * 0.78); g.stroke();
+    if(id === 'night'){
+      g.fillStyle = 'rgba(255,255,255,.5)';
+      for(let i = 0; i < 12; i++) g.fillRect(Math.random() * sw, Math.random() * sh * 0.6, 2, 2);
+      g.fillStyle = '#FFE9A8'; g.beginPath(); g.arc(sw * 0.8, sh * 0.22, 12, 0, 7); g.fill(); g.stroke();
+    }
+  }
+  g.fillStyle = '#D98E6A';
+  rrect(sw * 0.4, sh * 0.42, sw * 0.2, sh * 0.22, 5); g.fill(); g.stroke();
+  g.fillStyle = '#FFE08A';
+  [[0.18, 0.7], [0.74, 0.66]].forEach(([x, y]) => {
+    g.beginPath(); g.arc(sw * x, sh * y, 7, 0, 7); g.fill(); g.stroke(); });
+  g = og; W = oW; H = oH;
 }
 /* 알바 카드 그림 */
 function drawJobIcon(cvs, id){
@@ -277,7 +446,7 @@ function openModal(kind){
   modalOpen = kind;
   const body = $('modalBody'); body.innerHTML = '';
   const sheet = modal.querySelector('.sheet');
-  sheet.className = 'sheet' + (['wardrobe', 'gacha', 'shop', 'song', 'job'].includes(kind) ? ' wide' : '');
+  sheet.className = 'sheet' + (['wardrobe','gacha','shop','song','job','course','daily'].includes(kind) ? ' wide' : '');
   $('modalClose').textContent = '확인'; $('modalClose').hidden = false;
 
   if(kind === 'wardrobe'){
@@ -292,6 +461,10 @@ function openModal(kind){
     $('modalTitle').textContent = '클로버 뽑기';
     $('modalHint').textContent = '';
     buildGacha(body);
+  } else if(kind === 'course'){
+    $('modalTitle').textContent = '배달 코스';
+    $('modalHint').textContent = '경력이 쌓이면 어려운 코스가 열려요 (시급도 높아요)';
+    buildCourses(body);
   } else if(kind === 'job'){
     $('modalTitle').textContent = '알바하러 가기';
     $('modalHint').textContent = '일하고 오면 클로버와 경험치를 벌어와요';
@@ -540,7 +713,7 @@ function paintCareBar(){
     b.className = 'carebtn' + (ok ? '' : ' off') + (want ? ' want' : '');
     b.title = c.tip;
     b.innerHTML = '<span class="ic c-' + kind + '"></span><b>' + c.name + '</b>' +
-                  '<i>' + (c.cost ? '클로버 ' + c.cost : '무료') + '</i>';
+                  '<i>' + c.tip + '</i>';
     b.onclick = () => { doCare(kind); };
     bar.appendChild(b);
   });

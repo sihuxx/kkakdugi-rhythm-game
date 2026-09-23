@@ -38,7 +38,7 @@ function groundY(){ return H * 0.86; }
 
 /* 시작 · 끝 */
 function startGame(){
-  closeModal(); $('topbar').hidden = true; $('careBar').hidden = true;
+  closeModal(); $('topbar').hidden = true; $('careBar').hidden = true; deco = false;
   initAudio(); bgmStop(); if(ctx.state === 'suspended') ctx.resume();
   char = look();
   notes = buildChart(song, diff.id);
@@ -62,8 +62,8 @@ function endGame(){
   else if(acc >= 70) grade = '잎사귀';
   else grade = '새싹';
   const gmul = { '네잎클로버':1.6, '세잎':1.3, '잎사귀':1.05, '새싹':0.85 }[grade];
-  const pay = Math.round((score / 70 + maxCombo * 1.2 + 30) * gmul * diff.mult * payMult());
-  const exp = Math.round((8 + acc * 0.16 + maxCombo * 0.05) * diff.mult);
+  const before = S.career.dish || 0;
+  const pay = Math.round((score / 70 + maxCombo * 1.2 + 30) * gmul * diff.mult * payMult('dish'));
 
   $('gradeText').textContent = grade;
   $('scoreText').textContent = Math.round(score).toLocaleString('ko-KR');
@@ -75,16 +75,19 @@ function endGame(){
   $('bestText').textContent = (isNew ? '새 기록! ' : '최고 기록 ') +
     (S.best[k] || 0).toLocaleString('ko-KR') + ' · ' + song.title + ' · ' + diff.name;
   $('resultArt').src = grade === '네잎클로버' ? SRC.clover : SRC[char.run];
-  payOut(pay, exp, 'rewardText');
+  payOut(pay, 'dish', 'rewardText', song.title);
+  careerUp('dish', before);
   showScreen($('resultScreen'));
   bgmStart();
 }
-/* 보상 정산 — 두 미니게임이 같이 쓴다 */
-function payOut(pay, exp, elId){
-  addClover(pay); addExp(exp); afterOuting(); save(); refreshBar(); sfxCoin(4);
+/* 보상 정산 — 알바 세 개가 같이 쓴다 */
+function payOut(pay, jobId, elId, label){
+  addClover(pay); addLove(4); afterOuting(jobId); save(); refreshBar(); sfxCoin(4);
+  const lv = careerLv(S.career[jobId] || 0);
   $(elId).innerHTML = '<span class="paytop">오늘의 알바비</span>' + CLOVER_SVG +
-    '<b>+' + pay + '</b> 클로버 · <b>+' + exp + '</b> 경험치' +
-    '<small>일하고 왔더니 배부름 −18 · 기운 −22 · 깨끗함 −16</small>';
+    '<b>+' + pay + '</b> 클로버 · 마음 <b>+4</b>' +
+    '<small>' + (label || '') + ' · 경력 Lv' + lv + ' (' + (S.career[jobId] || 0) + '번째)' +
+    ' · 배부름 −16 · 기운 −20 · 깨끗함 −14</small>';
 }
 
 function pause(){

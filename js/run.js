@@ -9,7 +9,7 @@
 const DugiRun = (function(){
 "use strict";
 
-let SC = 1, GYs = 0, me = CHARS[0], stScale = 1, onEnd = null;
+let SC = 1, GYs = 0, me = CHARS[0], stScale = 1, onEnd = null, CO = COURSES[0];
 function sync(){ SC = H / 540; GYs = H * 0.80; }
 
 const clamp = (v,a,b) => v<a?a : v>b?b : v;
@@ -73,6 +73,21 @@ function buildMap(){
     else merged.push(sg);
   }
   segs = merged.sort((a,b) => a.x0 - b.x0);
+  /* 코스가 어려우면 장애물을 더 깔아둔다 (최소 간격은 지킨다) */
+  if(CO.dense > 1){
+    const ob = () => ents.filter(e => e.kind==='spike' || e.kind==='bar').sort((a,b)=>a.x-b.x);
+    const extra = Math.round((CO.dense - 1) * 14);
+    for(let i=0;i<extra;i++){
+      const sg = segs[Math.floor(Math.random()*segs.length)];
+      if(sg.x1 - sg.x0 < 700) continue;
+      const x = sg.x0 + 250 + Math.random()*(sg.x1 - sg.x0 - 500);
+      if(x > MAPEND - 1400) continue;
+      const list = ob();
+      if(list.some(e => Math.abs(e.x - x) < 380)) continue;
+      if(Math.random() < 0.55) spike(x, sg.y); else bar(x, sg.y);
+      ents.sort((a,b)=>a.x-b.x);
+    }
+  }
   ents.sort((a,b) => a.x - b.x);
   const flag = ents.find(e => e.kind === 'goal');
   GOALX = flag ? flag.x : MAPEND - 400;
@@ -154,17 +169,18 @@ const fx = [];
 const player = { x:0, y:0, vy:0, onGround:true, jumps:0, sliding:false, slideT:0, hp:3, inv:0, dead:false, coyote:0, buf:0 };
 
 const HP_MAX = 3;
-const GRAV = 2600, JUMP1 = 1020, JUMP2 = 940, V0 = 360, VMAX = 520, VACC = 5.5;
+const GRAV = 2600, JUMP1 = 1020, JUMP2 = 940, V0 = 400, VMAX = 600, VACC = 7;
 const PW = 44, PH = 74, PH_SLIDE = 38;
 
 function reset(){
   buildMap();
-  camX = 0; camY = 0; speed = V0; dist = 0; score = 0; jellyN = 0; combo = 0; maxCombo = 0;
+  camX = 0; camY = 0; speed = CO.v0; dist = 0; score = 0; jellyN = 0; combo = 0; maxCombo = 0;
   energy = 0; skill = null; skillT = 0; shake = 0; tick = 0; cleared = false;
   shield = skillIdOf(me) === 'shield' ? 1 : 0;   // 보호막 두기는 하나 들고 시작
+  speed = CO.v0;
   fx.length = 0;
   Object.assign(player, { x:120, y:0, vy:0, onGround:true, jumps:0, sliding:false, slideT:0,
-                          hp: skillIdOf(me)==='shield' ? 4 : 3, inv:0, dead:false, coyote:0, buf:0 });
+                          hp: CO.hp + (skillIdOf(me)==='shield' ? 1 : 0), inv:0, dead:false, coyote:0, buf:0 });
 }
 
 /* ===== 입력 ===== */
@@ -222,7 +238,7 @@ function update(dt){
   energy = Math.min(100, energy + dt*4.5);
 
   /* 속도 */
-  speed = Math.min(VMAX, speed + VACC*dt);
+  speed = Math.min(CO.vmax, speed + VACC*dt);
   let v = speed * (skill === 'slow' ? 0.72 : 1) * (skill === 'dash' ? 1.55 : 1);
   player.x += v*dt; dist += v*dt;
   score += v*dt*0.06;
@@ -230,7 +246,7 @@ function update(dt){
   /* 슬라이드 */
   if(player.sliding){
     player.slideT += dt;
-    if(!held.slide || player.slideT > 1.4 || !player.onGround) player.sliding = false;
+    if((!held.slide && !(CO.slippery && player.slideT < 0.55)) || player.slideT > 1.6 || !player.onGround) player.sliding = false;
     else if(Math.random() < dt*22) puff(player.x - 14, player.y, 1);
   }else if(held.slide && player.onGround) { player.sliding = true; player.slideT = 0; }
 
@@ -328,7 +344,7 @@ function fell(){
   const next = segs.find(s => s.x1 > player.x + 40) || segs[segs.length-1];
   player.x = Math.max(player.x, next.x0 + 70); player.y = next.y + 120;
   player.vy = 0; player.inv = 1.8; player.onGround = false; player.jumps = 1;
-  speed = Math.max(V0, speed - 80);
+  speed = Math.max(CO.v0*0.8, speed - 80);
   toastFx('앗!');
 }
 
@@ -337,7 +353,7 @@ function fell(){
    =============================================================== */
 function drawSky(){
   const gr = g.createLinearGradient(0, 0, 0, H);
-  gr.addColorStop(0, '#DCF0FB'); gr.addColorStop(0.62, '#F4FAF3'); gr.addColorStop(1, '#FFFDF6');
+  gr.addColorStop(0, CO.sky[0]); gr.addColorStop(0.62, CO.sky[1]); gr.addColorStop(1, '#FFFDF6');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
 
   /* 구름 */
@@ -428,10 +444,12 @@ function drawGround(){
 /* 동전 — 배달하며 줍는 것 */
 function coin(cx, cy, r, big){
   g.save(); g.translate(cx, cy);
+  if(CO && CO.dark){ g.shadowColor = 'rgba(255,224,138,.9)'; g.shadowBlur = r * 1.6; }
   g.strokeStyle = '#2B2B2B'; g.lineWidth = Math.min(r*0.34, LW()); g.lineJoin = 'round';
-  g.fillStyle = big ? '#FFD36E' : '#FFE08A';
+  g.fillStyle = big ? '#FFCB4F' : '#FFDD73';
   g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke();
-  g.fillStyle = big ? '#FFE9A8' : '#FFF3C9';
+  g.shadowBlur = 0;
+  g.fillStyle = big ? '#FFF0BE' : '#FFF6DA';
   g.beginPath(); g.arc(0, 0, r*0.68, 0, 7); g.fill(); g.stroke();
   g.fillStyle = '#7BC47F';
   for(let i=0;i<4;i++){
@@ -502,7 +520,7 @@ function drawEnt(e){
     g.beginPath(); g.moveTo(x - w*0.9, y1 + 2*SC); g.lineTo(x + w*0.9, y1 + 2*SC); g.stroke(); g.restore();
   }
   else if(e.kind === 'jelly' || e.kind === 'big'){
-    const r = (e.kind === 'big' ? 25 : 14) * SC, bob = Math.sin(tick*3 + e.bx*0.02)*3*SC;
+    const r = (e.kind === 'big' ? 27 : 16) * SC, bob = Math.sin(tick*3 + e.bx*0.02)*3*SC;
     const cy = yb + bob, spin = Math.abs(Math.cos(tick*2.2 + e.bx*0.01));
     g.fillStyle = e.kind === 'big' ? 'rgba(255,211,110,.45)' : 'rgba(255,224,138,.3)';
     g.beginPath(); g.arc(x, cy, r*(e.kind === 'big' ? 1.6 : 1.3), 0, 7); g.fill();
@@ -532,34 +550,30 @@ function drawPlayer(){
   const ph = player.sliding ? PH_SLIDE : PH;
   const x = sx(player.x), yb = sy(player.y);
   const air = !player.onGround;
-  const key = air ? (player.vy > 0 ? me.jump : me.fall) : me.run;
-  const im = IMG[key] || IMG[me.run];
+  const im = IMG[me.run];                       // 입은 모습 그대로
   const baseH = 104 * (me.scale || 1) * stScale * SC;
   const bob = air ? 0 : Math.abs(Math.sin(tick * (8 + speed/90))) * 7 * SC;
   let rot = 0, sqx = 1, sqy = 1;
 
-  if(player.sliding){ rot = -1.15; sqx = 1.06; sqy = 0.78; }
-  else if(air) rot = player.vy > 0 ? (me.jumpRot ?? -0.2) : (me.fallRot ?? 0.42);
-  else rot = Math.sin(tick*(8 + speed/90)) * 0.08;
-
-  /* 그림자 */
-  const gSeg = groundAt(player.x, player.y);
-  if(gSeg){
-    const gy = sy(gSeg.y), k = clamp(1 - (player.y - gSeg.y)/260, 0.25, 1);
-    g.save(); g.globalAlpha = 0.16*k; g.fillStyle = '#2B2B2B';
-    g.beginPath(); g.ellipse(x, gy + 3*SC, 30*SC*k, 8*SC*k, 0, 0, 7); g.fill(); g.restore();
+  if(player.sliding){ sqx = 1.28; sqy = 0.56; rot = 0.06; }        // 납작하게
+  else if(air){
+    if(player.vy > 0){ sqx = 0.90; sqy = 1.16; rot = -0.05; }      // 솟을 땐 길쭉
+    else { sqx = 1.06; sqy = 0.94; rot = 0.04; }                   // 내려올 땐 살짝 납작
+  }else{
+    rot = Math.sin(tick*(8 + speed/90)) * 0.06;
+    const k2 = Math.abs(Math.sin(tick*(8 + speed/90)));
+    sqx = 1 + k2*0.03; sqy = 1 - k2*0.03;
   }
 
   g.save();
   const baseAlpha = (player.inv > 0 && Math.floor(player.inv*14) % 2 === 0) ? 0.35 : 1;
   g.globalAlpha = baseAlpha;
 
-  /* 돌진 잔상 */
   if(skill === 'dash'){
     g.globalAlpha = baseAlpha * 0.35;
     for(let i=1;i<=3;i++){
       g.save(); g.translate(x - i*26*SC, yb - bob - (me.float||0)*SC*0.4);
-      g.rotate(rot); g.scale(me.flip === false ? 1 : -1, 1);
+      g.rotate(rot); g.scale((me.flip === false ? 1 : -1)*sqx, sqy);
       if(im && im.complete) g.drawImage(im, -baseH*0.5, -baseH, baseH, baseH);
       g.restore();
     }
@@ -568,12 +582,12 @@ function drawPlayer(){
 
   g.translate(x, yb - bob - (me.float || 0) * SC * 0.4);
   g.rotate(rot); g.scale((me.flip === false ? 1 : -1) * sqx, sqy);
-  /* 등에 멘 배달 가방 */
+  /* 등에 멘 배달 가방 (몸 뒤쪽) */
   g.fillStyle = '#D98E6A'; g.strokeStyle = '#2B2B2B'; g.lineWidth = LW();
   const bw2 = baseH*0.36;
-  g.beginPath(); g.rect(baseH*0.10, -baseH*0.82, bw2, bw2*0.86); g.fill(); g.stroke();
-  g.beginPath(); g.moveTo(baseH*0.10, -baseH*0.82+bw2*0.32);
-  g.lineTo(baseH*0.10+bw2, -baseH*0.82+bw2*0.32); g.stroke();
+  g.beginPath(); g.rect(baseH*0.30, -baseH*0.86, bw2, bw2*0.9); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(baseH*0.30, -baseH*0.86+bw2*0.34);
+  g.lineTo(baseH*0.30+bw2, -baseH*0.86+bw2*0.34); g.stroke();
   if(im && im.complete && im.naturalWidth) g.drawImage(im, -baseH*0.5, -baseH, baseH, baseH);
   else { g.fillStyle = '#F2E8D9'; g.strokeStyle = '#2B2B2B'; g.lineWidth = LW();
          g.beginPath(); g.ellipse(0, -baseH*0.4, baseH*0.3, baseH*0.36, 0, 0, 7); g.fill(); g.stroke(); }
@@ -585,7 +599,7 @@ function drawPlayer(){
     g.strokeStyle = '#B9A7D9'; g.lineWidth = LW();
     g.beginPath(); g.ellipse(x, yb - ph*SC*0.5, PW*0.9*SC, ph*0.75*SC, 0, 0, 7); g.stroke(); g.restore();
   }
-  /* 스킬 남은 시간 고리 */
+  /* 스킬 남은 시간 */
   if(skillT > 0){
     const sk = SKILLS[skill];
     g.save(); g.strokeStyle = sk.color; g.lineWidth = LW(); g.lineCap = 'round';
@@ -593,7 +607,6 @@ function drawPlayer(){
     g.stroke(); g.restore();
   }
 }
-
 function drawFx(){
   for(const p of fx){
     const k = 1 - p.t/p.life, x = sx(p.x), y = sy(p.y);
@@ -619,7 +632,7 @@ function drawHud(){
   g.fillStyle = '#2B2B2B'; g.font = `700 ${20*k}px Gaegu, sans-serif`;
   g.fillText('× ' + jellyN + (combo > 2 ? '   ' + combo + ' 연속!' : ''), 41*k, 65*k);
   /* 체력 */
-  for(let i=0;i<Math.max(HP_MAX, player.hp);i++){
+  for(let i=0;i<Math.max(CO.hp, player.hp);i++){
     g.globalAlpha = i < player.hp ? 1 : 0.2;
     clover(26*k + i*26*k, 92*k, 11*k, i < player.hp ? '#FFB3C1' : '#FFFDF6');
   }
@@ -669,13 +682,20 @@ function draw(){
   drawPlayer();
   drawFx();
   g.restore();
+  if(CO.dark){                                   // 야간 — 두기 주변만 밝게
+    const px = sx(player.x), py = sy(player.y + 40);
+    const gr2 = g.createRadialGradient(px, py, H*0.10, px, py, H*0.62);
+    gr2.addColorStop(0, 'rgba(20,22,40,0)'); gr2.addColorStop(1, 'rgba(20,22,40,.62)');
+    g.fillStyle = gr2; g.fillRect(0, 0, W, H);
+  }
   if(state === 'play' || state === 'pause') drawHud();
 }
 
 /* ===== 바깥에서 쓰는 창구 ===== */
 function start(o){
   me = o.look || CHARS[0];
-  stScale = (STAGES[o.stage || 0] || STAGES[0]).scale * 0.95 + 0.1;
+  stScale = 1;
+  CO = COURSE(o.course || 'town');
   onEnd = o.onEnd;
   sync(); reset(); hits.length = 0; state = 'play';
   held.jump = held.slide = false;
